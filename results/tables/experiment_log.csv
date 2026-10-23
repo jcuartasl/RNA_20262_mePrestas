@@ -1,0 +1,2 @@
+timestamp,experiment,seed,config_id,n_params,seconds,metrics,config
+2026-10-23T15:46:47,test_experiment,42,5f421c83,123456,12.34,"{""accuracy"": 0.95}","{""model"": ""MLP"", ""hidden_layers"": [64, 32], ""lr"": 0.01}"

@@ -1,4 +1,5 @@
 from .config import load_config
 from .seed import set_seed
+from .registry import log_run, summarize_budget
 
-__all__ = ["load_config", "set_seed"]
+__all__ = ["load_config", "set_seed", "log_run", "summarize_budget"]

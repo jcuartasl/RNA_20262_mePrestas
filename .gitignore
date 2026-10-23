@@ -1,0 +1,8 @@
+# Datos originales pesados: no se suben
+data/raw/*
+!data/raw/.gitkeep
+
+# Entorno y temporales
+.venv/
+__pycache__/
+*.pyc

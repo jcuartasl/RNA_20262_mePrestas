@@ -1,8 +1,19 @@
-# Datos originales pesados: no se suben
+# Datos originales pesados (>100 MB de Kaggle): no se suben
 data/raw/*
 !data/raw/.gitkeep
+!data/raw/LCDataDictionary.xlsx
+!data/raw/fecha_consulta.py
 
-# Entorno y temporales
-.venv/
+# Entorno virtual y Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.env
+.venv/
+venv/
+ENV/
+
+# Checkpoints y archivos temporales
+.ipynb_checkpoints/
+*.tmp
+*.log

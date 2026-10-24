@@ -1,3 +1,9 @@
+# Datos originales pesados (>100 MB de Kaggle): no se suben
+data/raw/*
+!data/raw/.gitkeep
+!data/raw/LCDataDictionary.xlsx
+!data/raw/fecha_consulta.py
+
 # Entorno virtual y Python
 __pycache__/
 *.py[cod]
@@ -6,13 +12,6 @@ __pycache__/
 .venv/
 venv/
 ENV/
-
-# Datos crudos gigantes (superan límites de GitHub: 100 MB)
-# Requisito de la guía: reproducibles con código, no versionar archivos > 100MB
-data/raw/loan.csv
-data/raw/archive.zip
-data/raw/*.zip
-data/raw/*.csv
 
 # Checkpoints y archivos temporales
 .ipynb_checkpoints/

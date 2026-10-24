@@ -1,0 +1,974 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101d19">
+    <title>¿Me prestas? — Laboratorio de riesgo</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+        :root {
+            --bg: #101d19;
+            --panel: #192a24;
+            --panel2: #21362e;
+            --ink: #f2f0df;
+            --muted: #a4b7a7;
+            --lime: #d4ff5b;
+            --pink: #ff7895;
+            --cyan: #75e6d1;
+            --line: #496254;
+            --amber: #ffc36e;
+            --mono: 'DM Mono', monospace;
+            --sans: 'Space Grotesk', sans-serif;
+            --shadow: 5px 5px 0 #080f0d
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        html {
+            scroll-behavior: smooth
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: var(--sans);
+            background-image: radial-gradient(#436052 1px, transparent 1px);
+            background-size: 22px 22px
+        }
+
+        button,
+        input {
+            font: inherit
+        }
+
+        button {
+            cursor: pointer
+        }
+
+        .wrap {
+            width: min(1160px, calc(100% - 36px));
+            margin: auto
+        }
+
+        .topline {
+            border-bottom: 1px solid var(--line);
+            background: #0c1713e8;
+            position: sticky;
+            top: 0;
+            z-index: 4;
+            backdrop-filter: blur(10px)
+        }
+
+        .nav {
+            height: 62px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between
+        }
+
+        .brand {
+            font: 500 13px var(--mono);
+            letter-spacing: .06em;
+            color: var(--lime)
+        }
+
+        .navlinks {
+            display: flex;
+            gap: 22px
+        }
+
+        .navlinks a {
+            color: var(--muted);
+            text-decoration: none;
+            font: 12px var(--mono)
+        }
+
+        .navlinks a:hover {
+            color: var(--lime)
+        }
+
+        .hero {
+            padding: 62px 0 45px;
+            display: grid;
+            grid-template-columns: 1.1fr .9fr;
+            gap: 40px;
+            align-items: center
+        }
+
+        .eyebrow {
+            font: 12px var(--mono);
+            color: var(--lime);
+            letter-spacing: .13em;
+            text-transform: uppercase
+        }
+
+        .hero h1 {
+            font-size: clamp(48px, 7vw, 88px);
+            line-height: .9;
+            letter-spacing: -.07em;
+            margin: 18px 0 22px;
+            max-width: 650px
+        }
+
+        .hero h1 span {
+            color: var(--lime)
+        }
+
+        .lead {
+            font-size: 17px;
+            color: #c2d0c3;
+            line-height: 1.6;
+            max-width: 620px
+        }
+
+        .tags {
+            display: flex;
+            gap: 9px;
+            flex-wrap: wrap;
+            margin-top: 24px
+        }
+
+        .tag {
+            font: 11px var(--mono);
+            padding: 7px 10px;
+            border: 1px solid var(--line);
+            color: var(--cyan);
+            background: #182820
+        }
+
+        .hero-art {
+            position: relative;
+            padding: 18px
+        }
+
+        .pixel-card {
+            border: 1px solid var(--lime);
+            background: var(--panel);
+            padding: 18px;
+            box-shadow: var(--shadow);
+            transform: rotate(1deg)
+        }
+
+        .pixel-top {
+            display: flex;
+            justify-content: space-between;
+            font: 11px var(--mono);
+            color: var(--muted);
+            border-bottom: 1px dashed var(--line);
+            padding-bottom: 12px
+        }
+
+        .score-preview {
+            padding: 26px 6px 16px;
+            display: flex;
+            align-items: end;
+            justify-content: space-between
+        }
+
+        .big-score {
+            font: 58px var(--mono);
+            color: var(--lime);
+            line-height: 1
+        }
+
+        .big-score small {
+            font-size: 12px;
+            color: var(--muted);
+            display: block;
+            margin-top: 8px
+        }
+
+        .stamp {
+            border: 2px solid var(--pink);
+            color: var(--pink);
+            padding: 8px;
+            font: 11px var(--mono);
+            transform: rotate(-8deg)
+        }
+
+        .mini-bars {
+            height: 60px;
+            display: flex;
+            gap: 6px;
+            align-items: end
+        }
+
+        .mini-bars i {
+            display: block;
+            background: var(--cyan);
+            width: 10%;
+            height: var(--h);
+            opacity: .85
+        }
+
+        .ticker {
+            background: var(--lime);
+            color: #142019;
+            font: 11px var(--mono);
+            padding: 10px 0;
+            overflow: hidden;
+            white-space: nowrap
+        }
+
+        .ticker span {
+            display: inline-block;
+            animation: roll 25s linear infinite
+        }
+
+        @keyframes roll {
+            to {
+                transform: translateX(-45%)
+            }
+        }
+
+        .notice {
+            margin: 30px auto 0;
+            border: 1px solid var(--amber);
+            background: #352919;
+            padding: 15px 18px;
+            color: #ffe2b0;
+            font-size: 13px;
+            line-height: 1.5;
+            display: flex;
+            gap: 12px;
+            align-items: start
+        }
+
+        .notice b {
+            font: 12px var(--mono);
+            color: var(--amber);
+            white-space: nowrap
+        }
+
+        .section {
+            padding: 64px 0
+        }
+
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: end;
+            gap: 20px;
+            margin-bottom: 24px
+        }
+
+        .section-head h2 {
+            font-size: clamp(28px, 4vw, 42px);
+            letter-spacing: -.05em;
+            margin: 8px 0 0
+        }
+
+        .section-head p {
+            color: var(--muted);
+            max-width: 400px;
+            line-height: 1.5;
+            margin: 0;
+            font-size: 14px
+        }
+
+        .grid2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            box-shadow: var(--shadow);
+            padding: 22px
+        }
+
+        .panel-title {
+            font: 12px var(--mono);
+            color: var(--cyan);
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px
+        }
+
+        .form-row {
+            margin: 18px 0
+        }
+
+        .label-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            margin-bottom: 9px
+        }
+
+        .label-line output {
+            font: 12px var(--mono);
+            color: var(--lime)
+        }
+
+        input[type=range] {
+            width: 100%;
+            accent-color: var(--lime);
+            height: 5px
+        }
+
+        .range-ends {
+            display: flex;
+            justify-content: space-between;
+            font: 10px var(--mono);
+            color: #829889;
+            margin-top: 5px
+        }
+
+        .selectbox {
+            width: 100%;
+            background: #102019;
+            border: 1px solid var(--line);
+            color: var(--ink);
+            padding: 10px 12px
+        }
+
+        .results {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px
+        }
+
+        .metric {
+            background: #102019;
+            border: 1px solid #385347;
+            padding: 14px
+        }
+
+        .metric span {
+            font: 10px var(--mono);
+            color: var(--muted);
+            text-transform: uppercase;
+            display: block
+        }
+
+        .metric strong {
+            font: 26px var(--mono);
+            color: var(--lime);
+            display: block;
+            margin: 8px 0 4px
+        }
+
+        .metric small {
+            font-size: 11px;
+            color: #9eb1a2
+        }
+
+        .meter {
+            height: 8px;
+            background: #31483c;
+            margin-top: 12px;
+            position: relative
+        }
+
+        .meter i {
+            height: 100%;
+            display: block;
+            background: var(--pink);
+            width: var(--value);
+            transition: width .2s
+        }
+
+        .result-note {
+            font: 11px var(--mono);
+            color: var(--muted);
+            margin-top: 16px
+        }
+
+        .btn {
+            border: 0;
+            background: var(--lime);
+            color: #122019;
+            padding: 12px 15px;
+            font: 12px var(--mono);
+            font-weight: 500;
+            box-shadow: 3px 3px 0 #637c2b;
+            transition: transform .1s
+        }
+
+        .btn:hover {
+            transform: translate(2px, 2px);
+            box-shadow: 1px 1px 0 #637c2b
+        }
+
+        .btn.secondary {
+            background: transparent;
+            color: var(--cyan);
+            border: 1px solid var(--cyan);
+            box-shadow: none
+        }
+
+        .btnrow {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap
+        }
+
+        .tabbar {
+            display: flex;
+            border-bottom: 1px solid var(--line);
+            gap: 4px;
+            margin-bottom: 18px
+        }
+
+        .tab {
+            background: transparent;
+            color: var(--muted);
+            border: 0;
+            padding: 10px 14px;
+            font: 11px var(--mono);
+            border-bottom: 2px solid transparent
+        }
+
+        .tab.active {
+            color: var(--lime);
+            border-color: var(--lime)
+        }
+
+        .chart-wrap {
+            height: 250px;
+            position: relative
+        }
+
+        .chart-wrap canvas {
+            width: 100%;
+            height: 100%
+        }
+
+        .chart-legend {
+            display: flex;
+            gap: 18px;
+            font: 10px var(--mono);
+            color: var(--muted);
+            margin-top: 10px
+        }
+
+        .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--lime);
+            margin-right: 6px
+        }
+
+        .dot.pink {
+            background: var(--pink)
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px
+        }
+
+        .stat {
+            border-top: 2px solid var(--lime);
+            background: var(--panel);
+            padding: 16px
+        }
+
+        .stat label {
+            font: 10px var(--mono);
+            color: var(--muted);
+            text-transform: uppercase
+        }
+
+        .stat b {
+            font: 27px var(--mono);
+            display: block;
+            color: var(--lime);
+            margin: 9px 0 3px
+        }
+
+        .stat small {
+            font-size: 11px;
+            color: #9eb1a2
+        }
+
+        .hypotheses {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px
+        }
+
+        .hypo {
+            padding: 18px;
+            border: 1px solid var(--line);
+            background: var(--panel)
+        }
+
+        .hypo .n {
+            font: 11px var(--mono);
+            color: var(--pink)
+        }
+
+        .hypo h3 {
+            font-size: 16px;
+            margin: 12px 0 8px
+        }
+
+        .hypo p {
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.5;
+            margin: 0
+        }
+
+        .status {
+            display: inline-block;
+            margin-top: 14px;
+            font: 10px var(--mono);
+            color: var(--amber);
+            border: 1px solid #725934;
+            padding: 5px 7px
+        }
+
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: var(--line);
+            border: 1px solid var(--line)
+        }
+
+        .step {
+            background: var(--panel);
+            padding: 18px
+        }
+
+        .step b {
+            font: 12px var(--mono);
+            color: var(--lime)
+        }
+
+        .step h3 {
+            font-size: 15px;
+            margin: 14px 0 7px
+        }
+
+        .step p {
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.5;
+            margin: 0
+        }
+
+        .links {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap
+        }
+
+        .links a {
+            color: var(--cyan);
+            font: 12px var(--mono);
+            text-decoration: none;
+            border-bottom: 1px solid var(--cyan);
+            padding-bottom: 3px
+        }
+
+        footer {
+            border-top: 1px solid var(--line);
+            padding: 24px 0 40px;
+            color: var(--muted);
+            font: 11px var(--mono);
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+            flex-wrap: wrap
+        }
+
+        .tiny {
+            font: 10px var(--mono);
+            color: #829889
+        }
+
+        .tooltip {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.5
+        }
+
+        .scoreline {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px dashed var(--line);
+            padding: 9px 0;
+            font: 12px var(--mono)
+        }
+
+        .scoreline strong {
+            color: var(--lime)
+        }
+
+        @media(max-width:800px) {
+            .hero {
+                grid-template-columns: 1fr;
+                padding-top: 40px
+            }
+
+            .hero-art {
+                max-width: 540px
+            }
+
+            .grid2 {
+                grid-template-columns: 1fr
+            }
+
+            .stats {
+                grid-template-columns: 1fr 1fr
+            }
+
+            .hypotheses {
+                grid-template-columns: 1fr
+            }
+
+            .steps {
+                grid-template-columns: 1fr 1fr
+            }
+
+            .section-head {
+                display: block
+            }
+
+            .section-head p {
+                margin-top: 12px
+            }
+
+            .navlinks {
+                gap: 10px
+            }
+
+            .navlinks a {
+                font-size: 10px
+            }
+        }
+
+        @media(max-width:480px) {
+            .navlinks a:nth-child(2) {
+                display: none
+            }
+
+            .wrap {
+                width: min(100% - 24px, 1160px)
+            }
+
+            .panel {
+                padding: 16px
+            }
+
+            .steps {
+                grid-template-columns: 1fr
+            }
+
+            .hero h1 {
+                font-size: 54px
+            }
+
+            .notice {
+                display: block
+            }
+
+            .notice b {
+                display: block;
+                margin-bottom: 6px
+            }
+        }
+
+        
+    </style>
+</head>
+
+
+<body>
+    <header class="topline">
+        <div class="wrap nav">
+            <div class="brand">[LAB] / RIESGO_CREDITICIO</div>
+            <nav class="navlinks"><a href="#simulador">SIMULADOR</a><a href="#metodo">METODOLOGÍA</a><a
+                    href="#resultados">RESULTADOS</a></nav>
+        </div>
+    </header>
+    <main>
+        <section class="wrap hero">
+            <div>
+                <div class="eyebrow">Proyecto · Redes neuronales y datos tabulares</div>
+                <h1>¿Me<br><span>prestas?</span></h1>
+                <p class="lead">Un laboratorio interactivo para explorar cómo se estima el riesgo de crédito. Comparamos
+                    un modelo interpretable con una red neuronal y examinamos qué ocurre cuando cambian las
+                    características de un solicitante.</p>
+                <div class="tags"><span class="tag">01 / CLASIFICACIÓN · PD</span><span class="tag">02 / REGRESIÓN ·
+                        LGD</span><span class="tag">03 / SCORECARD</span></div>
+            </div>
+            <div class="hero-art">
+                <div class="pixel-card">
+                    <div class="pixel-top"><span>DEMO / PERFIL #0042</span><span>● SISTEMA ACTIVO</span></div>
+                    <div class="score-preview">
+                        <div class="big-score" id="heroScore">642<small>PUNTAJE SIMULADO</small></div>
+                        <div class="stamp">DATOS<br>DEMO</div>
+                    </div>
+                    <div class="mini-bars" aria-hidden="true"><i style="--h:24%"></i><i style="--h:38%"></i><i
+                            style="--h:31%"></i><i style="--h:54%"></i><i style="--h:45%"></i><i style="--h:68%"></i><i
+                            style="--h:56%"></i><i style="--h:84%"></i><i style="--h:72%"></i><i style="--h:95%"></i>
+                    </div>
+                    <div class="pixel-top" style="border:0;padding:12px 0 0"><span>PD ESTIMADA</span><span
+                            id="heroPd">18.4%</span></div>
+                </div>
+            </div>
+        </section>
+        <div class="ticker"><span>✳ DATOS SINTÉTICOS PARA PROTOTIPADO &nbsp; ✳ NO USAR PARA DECISIONES FINANCIERAS
+                &nbsp; ✳ RESULTADOS FICTICIOS &nbsp; ✳ PD × LGD × EAD &nbsp; ✳ DATOS SINTÉTICOS PARA PROTOTIPADO &nbsp;
+                ✳ NO USAR PARA DECISIONES FINANCIERAS &nbsp; ✳</span></div>
+        <div class="wrap notice"><b>AVISO / DEMO</b><span>Esta página funciona con datos y métricas ficticios. Los
+                valores sirven para probar la interfaz y no son resultados del conjunto de Kaggle ni predicciones de un
+                modelo entrenado. Sustitúyanlos por resultados reproducibles antes de publicar el informe.</span></div>
+        <section class="wrap section" id="simulador">
+            <div class="section-head">
+                <div>
+                    <div class="eyebrow">01 — Explora el modelo</div>
+                    <h2>Simulador de perfil</h2>
+                </div>
+                <p>Mueve los controles para observar el efecto ilustrativo sobre probabilidad, puntaje y pérdida
+                    esperada.</p>
+            </div>
+            <div class="grid2">
+                <div class="panel">
+                    <div class="panel-title"><span>ENTRADA / CLIENTE</span><span>● LIVE</span></div>
+                    <div class="panel-body">
+                        <p>Información del cliente</p>
+                    </div>
+                </div>
+                <div class="panel">
+                    <div class="panel-title"><span>ENTRADA / CLIENTE</span><span>● LIVE</span></div>
+                    <div class="panel-body">
+                        <p>Información del cliente</p>
+                    </div>
+                </div>
+            </div>
+            <div class="grid2">
+                <div class="panel">
+                    <div class="panel-title"><span>ENTRADA / CLIENTE</span><span>● LIVE</span></div>
+                    +<div class="form-row">
+                        <div class="label-line"><label for="income">Ingreso mensual</label><output
+                                id="incomeOut">$3.200.000</output></div><input id="income" type="range" min="800000"
+                            max="10000000" step="100000" value="3200000">
+                        <div class="range-ends"><span>$800 mil</span><span>$10 millones</span></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="label-line"><label for="debt">Relación deuda / ingreso</label><output
+                                id="debtOut">32%</output></div><input id="debt" type="range" min="5" max="90"
+                            value="32">
+                        <div class="range-ends"><span>5%</span><span>90%</span></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="label-line"><label for="history">Antigüedad del historial</label><output
+                                id="historyOut">8 años</output></div><input id="history" type="range" min="0" max="30"
+                            value="8">
+                        <div class="range-ends"><span>0 años</span><span>30 años</span></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="label-line"><label for="loan">Monto solicitado</label><output
+                                id="loanOut">$12.000.000</output></div><input id="loan" type="range" min="1000000"
+                            max="50000000" step="500000" value="12000000">
+                        <div class="range-ends"><span>$1 millón</span><span>$50 millones</span></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="label-line"><label for="term">Plazo del crédito</label></div><select
+                            class="selectbox" id="term">
+                            <option value="36">36 meses</option>
+                            <option value="60">60 meses</option>
+                        </select>
+                    </div>
+                    <div class="btnrow"><button class="btn" id="randomize">↻ PERFIL ALEATORIO</button><button
+                            class="btn secondary" id="reset">RESTABLECER</button></div>
+                </div>
+                <div class="panel">
+                    <div class="panel-title"><span>SALIDA / ESTIMACIÓN</span><span id="riskTag">RIESGO MEDIO</span>
+                    </div>
+                    <div class="results">
+                        <div class="metric"><span>Prob. incumplimiento · PD</span><strong
+                                id="pdValue">18.4%</strong><small>Estimación ilustrativa</small>
+                            <div class="meter"><i id="pdMeter" style="--value:18.4%"></i></div>
+                        </div>
+                        <div class="metric"><span>Puntaje de prueba</span><strong
+                                id="scoreValue">642</strong><small>0–850 puntos · demo</small>
+                            <div class="meter"><i id="scoreMeter" style="--value:75%"></i></div>
+                        </div>
+                        <div class="metric"><span>LGD simulada</span><strong id="lgdValue">46%</strong><small>Fracción
+                                perdida si incumple</small></div>
+                        <div class="metric"><span>Pérdida esperada · E[L]</span><strong
+                                id="lossValue">$1,016,640</strong><small>PD × LGD × EAD (EAD = monto)</small></div>
+                    </div>
+                    <p class="result-note">* Fórmulas pedagógicas con parámetros inventados; no representa un modelo
+                        ajustado.</p>
+                    <div style="margin-top:22px">
+                        <div class="panel-title"><span>DESGLOSE DEL PUNTAJE</span></div>
+                        <div class="scoreline"><span>Base de referencia</span><strong>600</strong></div>
+                        <div class="scoreline"><span>Deuda / ingreso</span><strong id="debtPoints">−26 pts</strong>
+                        </div>
+                        <div class="scoreline"><span>Historial crediticio</span><strong id="historyPoints">+32
+                                pts</strong></div>
+                        <div class="scoreline"><span>Ingreso mensual</span><strong id="incomePoints">+36 pts</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="wrap section" id="resultados">
+            <div class="section-head">
+                <div>
+                    <div class="eyebrow">02 — Lectura de resultados</div>
+                    <h2>Modelos en comparación</h2>
+                </div>
+                <p>Panel de muestra con métricas ficticias. Actualiza las curvas al cambiar entre particiones simuladas.
+                </p>
+            </div>
+            <div class="stats">
+                <div class="stat"><label>AUC · Regresión logística</label><b>0.71</b><small>Referencia
+                        [FICTICIA]</small></div>
+                <div class="stat"><label>AUC · Red neuronal</label><b>0.73</b><small>MLP [FICTICIA]</small></div>
+                <div class="stat"><label>KS · Red neuronal</label><b>0.34</b><small>Prueba [FICTICIA]</small></div>
+                <div class="stat"><label>Brier · Red neuronal</label><b>0.18</b><small>Menor es mejor [FICTICIO]</small>
+                </div>
+            </div>
+            <div class="panel" style="margin-top:18px">
+                <div class="panel-title"><span>CURVAS DE VALIDACIÓN / ILUSTRATIVAS</span><span id="chartType">ROC</span>
+                </div>
+                <div class="tabbar"><button class="tab active" data-chart="roc">ROC</button><button class="tab"
+                        data-chart="calibration">CALIBRACIÓN</button><button class="tab" data-chart="distribution">LGD /
+                        DISTRIBUCIÓN</button></div>
+                <div class="chart-wrap"><canvas id="chart" aria-label="Gráfico de métricas ficticias"
+                        role="img"></canvas></div>
+                <div class="chart-legend"><span><i class="dot"></i><span id="legendOne">MLP
+                            sintético</span></span><span><i class="dot pink"></i><span id="legendTwo">Regresión
+                            logística sintética</span></span></div>
+                <p class="tiny">Visualizaciones construidas con coordenadas generadas para la demo. Reemplazar con
+                    salidas de evaluación reales.</p>
+            </div>
+        </section>
+        <section class="wrap section" id="metodo">
+            <div class="section-head">
+                <div>
+                    <div class="eyebrow">03 — Cómo se construye</div>
+                    <h2>Del dato a la decisión</h2>
+                </div>
+                <p>La ruta del proyecto: separar correctamente los datos, evaluar con métricas complementarias y
+                    documentar límites.</p>
+            </div>
+            <div class="steps">
+                <div class="step"><b>01 / DATOS</b>
+                    <h3>Definir incumplimiento</h3>
+                    <p>Crear la etiqueta a partir de loan_status y excluir estados sin resultado final confirmado.</p>
+                </div>
+                <div class="step"><b>02 / PARTICIONES</b>
+                    <h3>Separar en el tiempo</h3>
+                    <p>Crear train, validación y prueba; reservar originaciones recientes para evaluar generalización.
+                    </p>
+                </div>
+                <div class="step"><b>03 / MODELOS</b>
+                    <h3>Comparar con equidad</h3>
+                    <p>Usar el mismo preprocesamiento y particiones para referencia logística y perceptrón multicapa.
+                    </p>
+                </div>
+                <div class="step"><b>04 / EXPLICAR</b>
+                    <h3>Medir y comunicar</h3>
+                    <p>Revisar discriminación, calibración, variabilidad, complejidad y limitaciones de uso.</p>
+                </div>
+            </div>
+        </section>
+        <section class="wrap section">
+            <div class="section-head">
+                <div>
+                    <div class="eyebrow">04 — Preguntas del equipo</div>
+                    <h2>Hipótesis por comprobar</h2>
+                </div>
+                <p>Ejemplos de hipótesis de trabajo, todavía sin validar. Sustituyan el estado tras explorar los datos
+                    reales.</p>
+            </div>
+            <div class="hypotheses">
+                <article class="hypo">
+                    <div class="n">HIPÓTESIS / 01</div>
+                    <h3>Más deuda, mayor riesgo</h3>
+                    <p>Una relación deuda/ingreso alta podría asociarse con una tasa de incumplimiento superior.</p>
+                    <span class="status">PENDIENTE DE ANÁLISIS</span>
+                </article>
+                <article class="hypo">
+                    <div class="n">HIPÓTESIS / 02</div>
+                    <h3>El historial aporta señal</h3>
+                    <p>La antigüedad del historial podría relacionarse con diferencias en el comportamiento de pago.</p>
+                    <span class="status">PENDIENTE DE ANÁLISIS</span>
+                </article>
+                <article class="hypo">
+                    <div class="n">HIPÓTESIS / 03</div>
+                    <h3>PD no cuenta toda la historia</h3>
+                    <p>Dos perfiles con igual probabilidad de incumplimiento pueden tener pérdidas distintas si difiere
+                        su exposición o recuperación.</p><span class="status">PENDIENTE DE ANÁLISIS</span>
+                </article>
+            </div>
+        </section>
+        <section class="wrap section">
+            <div class="section-head">
+                <div>
+                    <div class="eyebrow">05 — Próximos pasos</div>
+                    <h2>Completa el reporte</h2>
+                </div>
+                <p>Conecta este prototipo visual con el análisis y los artefactos reproducibles del equipo.</p>
+            </div>
+            <div class="panel">
+                <div class="links"><a href="#">REPOSITORIO GIT ↗</a><a href="#">APLICACIÓN ↗</a><a href="#">VIDEO
+                        PROMOCIONAL ↗</a></div>
+                <p class="tooltip" style="margin:20px 0 0">Sustituye los enlaces de ejemplo. Añade tablas y figuras
+                    numeradas con fuente, bibliografía APA 7 verificada, la sección de uso de IA y la cacería de
+                    alucinaciones con evidencia real. Consulta el diccionario de datos para describir las variables.</p>
+            </div>
+        </section>
+        </main>
+    <footer class="wrap"><span>¿ME PRESTAS? · PROTOTIPO DE CURSO · 2026</span><span>TODO DATO Y RESULTADO DE ESTA DEMO
+            ES FICTICIO</span></footer>
+    
+    <script>
+        const $ = s => document.querySelector(s), fmtCOP = n => '$' + Math.round(n).toLocaleString('es-CO'), controls = ['income', 'debt', 'history', 'loan', 'term'];
+        const initial = { income: 3200000, debt: 32, history: 8, loan: 12000000, term: '36' };
+        function compute() {
+            const inc = +$('#income').value, debt = +$('#debt').value, hist = +$('#history').value, loan = +$('#loan').value, term = +$('#term').value;
+            $('#incomeOut').value=fmtCOP(inc); $('#debtOut').value = debt + '%'; $('#historyOut').value = hist + ' años'; $('#loanOut').value = fmtCOP(loan);
+            // Funciones de juguete para actualizar la interfaz. No están entrenadas ni calibradas.
+                let logit = -2.05 + 0.035 * (debt - 30) - 0.055 * (hist - 8) - 0.00000006 * (inc - 3200000) + 0.12 * (term === 60 ? 1 : 0) + 0.000000006 * (loan - 12000000);
+            let pd = 1 / (1 + Math.exp(-logit)), lgd = Math.max(.2, Math.min(.75, .46 + 0.0016 * (debt - 32) + 0.000000002 * (loan - 12000000)));
+            let score = Math.round(Math.max(300, Math.min(850, 600 + 50 * Math.log2((1 - pd) / pd / 20)))); let loss = pd * lgd * loan;
+            $('#pdValue').textContent=(pd * 100).toFixed(1) + '%'; $('#heroPd').textContent = (pd * 100).toFixed(1) + '%'; $('#scoreValue').textContent = score; $('#heroScore').childNodes[0].textContent = score;
+            $('#lgdValue').textContent=(lgd * 100).toFixed(0) + '%'; $('#lossValue').textContent = fmtCOP(loss); $('#pdMeter').style.setProperty('--value', Math.min(100, pd * 100) + '%'); $('#scoreMeter').style.setProperty('--value', ((score - 300) / 550 * 100) + '%');
+            let risk = pd < .12 ? 'RIESGO BAJO' : pd < .25 ? 'RIESGO MEDIO' : 'RIESGO ALTO'; $('#riskTag').textContent = risk; $('#riskTag').style.color = pd < .12 ? 'var(--cyan)' : pd < .25 ? 'var(--amber)' : 'var(--pink)';
+            $('#debtPoints').textContent=(debt < 32 ? '+' : '−') + Math.abs(Math.round((debt - 32) * 1.4)) + ' pts'; $('#historyPoints').textContent = (hist >= 8 ? '+' : '−') + Math.abs(Math.round((hist - 8) * 4)) + ' pts'; $('#incomePoints').textContent = (inc >= 3200000 ? '+' : '−') + Math.abs(Math.round((inc - 3200000) / 50000)) + ' pts';
+        }
+            controls.forEach(id => $('#' + id).addEventListener('input', compute));
+        $('#reset').addEventListener('click', () => { Object.entries(initial).forEach(([k, v]) => $('#' + k).value = v); compute() });
+        $('#randomize').addEventListener('click', () => { $('#income').value = 800000 + Math.random() * 9200000; $('#debt').value = 5 + Math.random() * 85; $('#history').value = Math.random() * 30; $('#loan').value = 1000000 + Math.random() * 49000000; $('#term').value = Math.random() < .5 ? '36' : '60'; compute() });
+        const canvas = $('#chart'), ctx = canvas.getContext('2d'); let chart = 'roc';
+        function draw() {
+            const dpr = window.devicePixelRatio || 1, rect = canvas.getBoundingClientRect(); canvas.width = rect.width * dpr; canvas.height = rect.height * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); let w = rect.width, h = rect.height, pad = 38; ctx.clearRect(0, 0, w, h); ctx.strokeStyle = '#385347'; ctx.lineWidth = 1; ctx.fillStyle = '#91a595'; ctx.font = '10px DM Mono, monospace';
+            for (let i = 0; i <= 4; i++) { let x = pad + (w - pad * 1.4) * i / 4, y = h - pad - (h - pad * 1.5) * i / 4; ctx.beginPath(); ctx.moveTo(x, pad); ctx.lineTo(x, h - pad); ctx.stroke(); ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(w - pad / 2, y); ctx.stroke(); ctx.fillText((i * 25) + '%', x - 10, h - pad + 16); ctx.fillText((i * 25) + '%', 4, y + 3) }
+            ctx.strokeStyle='#71877a'; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(pad, h - pad); ctx.lineTo(w - pad / 2, pad); ctx.stroke(); ctx.setLineDash([]);
+            const series = chart === 'roc' ? [[0, 0], [.08, .29], [.19, .48], [.32, .62], [.48, .74], [.67, .85], [.82, .93], [1, 1]] : chart === 'calibration' ? [[0, 0], [.12, .16], [.25, .31], [.38, .4], [.51, .54], [.66, .62], [.8, .82], [1, 1]] : [[0, .1], [.1, .14], [.2, .22], [.3, .38], [.4, .55], [.55, .76], [.7, .9], [1, .98]];
+            function line(points, color, offset = 0) { ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath(); points.forEach(([x, y], i) => { let xx = pad + (w - pad * 1.4) * x, yy = h - pad - (h - pad * 1.5) * y + (i % 3 === 0 ? offset : 0); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy) }); ctx.stroke(); ctx.fillStyle = color; points.forEach(([x, y]) => { ctx.beginPath(); ctx.arc(pad + (w - pad * 1.4) * x, h - pad - (h - pad * 1.5) * y + offset, 3, 0, Math.PI * 2); ctx.fill() }) }line(series, '#d4ff5b'); line(series.map(([x, y]) => [x, Math.max(0, y - .07 * (1 - x))]), '#ff7895', 4);
+            $('#chartType').textContent=chart === 'roc' ? 'ROC' : chart === 'calibration' ? 'CALIBRACIÓN' : 'LGD / DISTRIBUCIÓN'; $('#legendOne').textContent = chart === 'distribution' ? 'LGD observada sintética' : 'MLP sintético'; $('#legendTwo').textContent = chart === 'distribution' ? 'LGD predicha sintética' : 'Regresión logística sintética';
+        }
+            + document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { document.querySelectorAll('.tab').forEach(x => x.classList.remove('active')); b.classList.add('active'); chart = b.dataset.chart; draw() })); window.addEventListener('resize', draw); compute(); draw();
+        </script>
+    
+</body>
+
+
+</html>

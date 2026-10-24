@@ -3,8 +3,10 @@ import ast
 import copy
 import os
 import yaml
+from pathlib import Path
 
-DEFAULT_PATH = "../../configs/default.yaml"
+ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_PATH = ROOT / "configs" / "default.yaml"
 
 
 def _parse(value: str):

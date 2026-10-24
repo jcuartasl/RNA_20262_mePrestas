@@ -4,10 +4,12 @@ import hashlib
 import json
 import os
 from datetime import datetime
-
+from pathlib import Path
 import pandas as pd
 
-LOG_PATH = "results/tables/experiment_log.csv"
+
+ROOT = Path(__file__).resolve().parents[2]
+LOG_PATH = ROOT / "results" / "tables" / "experiment_log.csv"
 COLUMNS = ["timestamp", "experiment", "seed", "config_id",
            "n_params", "seconds", "metrics", "config"]
 

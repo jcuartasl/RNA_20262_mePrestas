@@ -1,9 +1,11 @@
 """Pruebas de src/models/losses.py: valores de referencia, gradientes y estabilidad numérica."""
+import numpy as np
 import pytest
 import torch
 import torch.nn.functional as F
 
-from src.models.losses import bce_con_logits, get_loss, gradiente_bce, gradiente_mse, mse_con_logits
+from src.models.losses import (bce_con_logits, bce_fraccional_con_logits, get_loss, gradiente_bce,
+                               gradiente_mse, mse_con_logits)
 
 
 def datos_bce(n=50, seed=0):
@@ -117,7 +119,69 @@ def test_mse_rechaza_entradas_invalidas():
     with pytest.raises(ValueError): mse_con_logits(torch.zeros(2), torch.tensor([-0.1, 0.5]))
 
 
+@pytest.mark.parametrize("reduction", ["mean", "sum", "none"])
+def test_bce_fraccional_contra_pytorch(reduction):
+    logits, target = datos_lgd()
+    esperado = F.binary_cross_entropy_with_logits(logits, target, reduction=reduction)
+    torch.testing.assert_close(bce_fraccional_con_logits(logits, target, reduction), esperado)
+
+
+def test_bce_fraccional_coincide_con_bce_en_etiquetas_binarias():
+    logits, target = datos_bce()
+    torch.testing.assert_close(bce_fraccional_con_logits(logits, target), bce_con_logits(logits, target))
+
+
+def test_bce_fraccional_minimo_en_y():
+    # si se predice justo y=0.7 el gradiente es 0, pero la pérdida no: queda la entropía H(0.7)
+    y = torch.tensor([0.7], dtype=torch.float64)
+    logits = torch.log(y / (1 - y)).requires_grad_()
+    perdida = bce_fraccional_con_logits(logits, y)
+    (gradiente,) = torch.autograd.grad(perdida, logits)
+    assert perdida.item() == pytest.approx(-(0.7 * np.log(0.7) + 0.3 * np.log(0.3)))
+    assert gradiente.abs().item() < 1e-12
+
+
+def test_bce_fraccional_estima_la_media():
+    # las y vienen de una beta(7, 3), que no es bernoulli; la mejor predicción constante debe ser
+    # la media (0.7) y no la mediana (~0.714) ni la moda (0.75)
+    y = torch.from_numpy(np.random.default_rng(0).beta(7, 3, 20000))
+    m = torch.linspace(0.6, 0.8, 2001, dtype=torch.float64).unsqueeze(1)
+    logits = torch.log(m / (1 - m)).expand(-1, len(y))
+    perdidas = bce_fraccional_con_logits(logits, y.expand(len(m), -1), reduction="none").mean(dim=1)
+    mejor = m[perdidas.argmin()].item()
+    assert mejor == pytest.approx(y.mean().item(), abs=2e-4)
+    assert abs(mejor - y.median().item()) > 0.01
+
+
+def test_gradiente_bce_fraccional_contra_autograd():
+    logits, target = datos_lgd()
+    logits.requires_grad_()
+    (gradiente,) = torch.autograd.grad(bce_fraccional_con_logits(logits, target), logits)
+    torch.testing.assert_close(gradiente, gradiente_bce(logits.detach(), target))
+
+
+def test_gradcheck_bce_fraccional():
+    logits, target = datos_lgd(n=10)
+    perdida = lambda z: bce_fraccional_con_logits(z, target)
+    assert torch.autograd.gradcheck(perdida, (logits.requires_grad_(),))
+
+
+@pytest.mark.parametrize("z", [50.0, -50.0])
+def test_bce_fraccional_no_se_satura_con_logits_extremos(z):
+    # mismo caso que en la mse (segura y equivocada con y=0.5), pero aquí el gradiente sigue en 0.5
+    logits, target = torch.tensor([z], requires_grad=True), torch.tensor([0.5])
+    perdida = bce_fraccional_con_logits(logits, target)
+    perdida.backward()
+    assert torch.isfinite(perdida) and logits.grad.abs().item() == pytest.approx(0.5)
+
+
+def test_bce_fraccional_rechaza_entradas_invalidas():
+    with pytest.raises(ValueError): bce_fraccional_con_logits(torch.zeros(3), torch.zeros(3, 1))
+    with pytest.raises(ValueError): bce_fraccional_con_logits(torch.zeros(2), torch.tensor([0.5, 1.5]))
+    with pytest.raises(ValueError): bce_fraccional_con_logits(torch.zeros(2), torch.tensor([-0.1, 0.5]))
+
+
 def test_get_loss():
-    assert get_loss("bce") is bce_con_logits
+    assert get_loss("bce") is bce_fraccional_con_logits
     assert get_loss("mse") is mse_con_logits
     with pytest.raises(ValueError): get_loss("hinge")

@@ -9,18 +9,29 @@ def _reducir(perdida, reduction):
     raise ValueError(f"reduction no válida: {reduction}")
 
 
-def bce_con_logits(logits, target, reduction="mean"):
-    """Log-verosimilitud negativa de una Bernoulli con p = sigmoide(logits)."""
-    if logits.shape != target.shape: raise ValueError("logits y target deben tener la misma forma")
-    if not torch.all((target == 0) | (target == 1)): raise ValueError("bce requiere etiquetas 0 o 1")
+def _bce_estable(logits, target):
     # -[y log s(z) + (1-y) log(1-s(z))] se simplifica a softplus(z) - y*z; logaddexp(0, z) es softplus
     # sin overflow y, a diferencia de max(z,0) + log1p(exp(-|z|)), autograd da bien el gradiente en z=0
-    perdida = torch.logaddexp(torch.zeros_like(logits), logits) - target * logits
-    return _reducir(perdida, reduction)
+    return torch.logaddexp(torch.zeros_like(logits), logits) - target * logits
+
+
+def bce_con_logits(logits, target, reduction="mean"):
+    """Log-verosimilitud negativa de una Bernoulli con p = sigmoide(logits), etiquetas 0/1 (pd)."""
+    if logits.shape != target.shape: raise ValueError("logits y target deben tener la misma forma")
+    if not torch.all((target == 0) | (target == 1)): raise ValueError("bce requiere etiquetas 0 o 1")
+    return _reducir(_bce_estable(logits, target), reduction)
+
+
+def bce_fraccional_con_logits(logits, target, reduction="mean"):
+    """Cuasi-verosimilitud de Bernoulli para target en [0, 1]; se minimiza en la media de y."""
+    if logits.shape != target.shape: raise ValueError("logits y target deben tener la misma forma")
+    if not torch.all((target >= 0) & (target <= 1)): raise ValueError("bce requiere target en [0, 1]")
+    # misma fórmula que la bce, pero con y continua no es una verosimilitud: no integra a 1 en [0, 1]
+    return _reducir(_bce_estable(logits, target), reduction)
 
 
 def gradiente_bce(logits, target):
-    """Gradiente analítico de la bce promedio respecto a los logits: (sigmoide(z) - y) / n."""
+    """Gradiente analítico de la bce promedio (binaria o fraccional) respecto a z: (s - y) / n."""
     return (torch.sigmoid(logits) - target) / logits.numel()
 
 
@@ -39,7 +50,7 @@ def gradiente_mse(logits, target):
     return 2 * (s - target) * s * (1 - s) / logits.numel()
 
 
-PERDIDAS = {"bce": bce_con_logits, "mse": mse_con_logits}
+PERDIDAS = {"bce": bce_fraccional_con_logits, "mse": mse_con_logits}
 
 
 def get_loss(name):

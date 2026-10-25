@@ -1,12 +1,14 @@
 """Pruebas de src/models/losses.py: valores de referencia, gradientes y estabilidad numérica."""
 import numpy as np
 import pytest
-from scipy.stats import beta as dist_beta
 import torch
 import torch.nn.functional as F
+from scipy.stats import beta as dist_beta
 
 from src.models.losses import (bce_con_logits, bce_fraccional_con_logits, beta_con_logits, get_loss,
-                               gradiente_bce, gradiente_beta, gradiente_mse, mse_con_logits)
+                               gradiente_bce, gradiente_beta, gradiente_mse, mse_con_logits,
+                               penalizacion_l1, penalizacion_l2)
+from src.models.mlp import build_mlp
 
 
 def datos_bce(n=50, seed=0):
@@ -259,6 +261,34 @@ def test_beta_rechaza_entradas_invalidas():
     cero = torch.tensor(0.0)
     with pytest.raises(ValueError): beta_con_logits(torch.zeros(3), torch.zeros(3, 1), cero)
     with pytest.raises(ValueError): beta_con_logits(torch.zeros(2), torch.tensor([0.5, 1.5]), cero)
+
+
+def mlp_pequeno():
+    torch.manual_seed(0)
+    return build_mlp({"input_dim": 4, "hidden_layers": [3], "dropout": 0.0}).double()
+
+
+def test_penalizaciones_valor_y_sin_sesgos():
+    modelo = mlp_pequeno()
+    w1, w2 = modelo.network[0].weight, modelo.network[2].weight
+    torch.testing.assert_close(penalizacion_l2(modelo), 0.5 * ((w1 ** 2).sum() + (w2 ** 2).sum()))
+    torch.testing.assert_close(penalizacion_l1(modelo), w1.abs().sum() + w2.abs().sum())
+    l2, l1 = penalizacion_l2(modelo).item(), penalizacion_l1(modelo).item()
+    with torch.no_grad():
+        for capa in (modelo.network[0], modelo.network[2]): capa.bias.add_(5.0)
+    assert penalizacion_l2(modelo).item() == l2 and penalizacion_l1(modelo).item() == l1
+
+
+def test_gradiente_de_las_penalizaciones():
+    modelo = mlp_pequeno()
+    penalizacion_l2(modelo).backward()
+    for nombre, p in modelo.named_parameters():
+        if nombre.endswith("bias"): assert p.grad is None
+        else: torch.testing.assert_close(p.grad, p.detach())
+    modelo.zero_grad(set_to_none=True)
+    penalizacion_l1(modelo).backward()
+    for nombre, p in modelo.named_parameters():
+        if not nombre.endswith("bias"): torch.testing.assert_close(p.grad, torch.sign(p.detach()))
 
 
 def test_get_loss():

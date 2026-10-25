@@ -79,6 +79,21 @@ def gradiente_beta(logits, target, log_phi, eps=1e-4):
     return d_logits, d_log_phi
 
 
+def _pesos(modelo):
+    # los sesgos no se penalizan: fijan el nivel base (p. ej. la lgd media) y no hay por qué encogerlos
+    return [p for nombre, p in modelo.named_parameters() if not nombre.endswith("bias")]
+
+
+def penalizacion_l2(modelo):
+    """Penalización l2 = 0.5 * suma(w^2) sobre los pesos; su gradiente es w, como el weight_decay."""
+    return 0.5 * sum((w ** 2).sum() for w in _pesos(modelo))
+
+
+def penalizacion_l1(modelo):
+    """Penalización l1 = suma(|w|) sobre los pesos; su subgradiente es signo(w)."""
+    return sum(w.abs().sum() for w in _pesos(modelo))
+
+
 PERDIDAS = {"bce": bce_fraccional_con_logits, "mse": mse_con_logits, "beta": beta_con_logits}
 
 

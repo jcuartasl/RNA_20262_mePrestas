@@ -24,7 +24,22 @@ def gradiente_bce(logits, target):
     return (torch.sigmoid(logits) - target) / logits.numel()
 
 
-PERDIDAS = {"bce": bce_con_logits}
+def mse_con_logits(logits, target, reduction="mean"):
+    """Log-verosimilitud negativa (salvo constantes) de una normal con media sigmoide(logits)."""
+    if logits.shape != target.shape: raise ValueError("logits y target deben tener la misma forma")
+    if not torch.all((target >= 0) & (target <= 1)): raise ValueError("mse requiere target en [0, 1]")
+    # sin logaritmos no hay overflow; el riesgo aquí es que el gradiente se apague si la sigmoide satura
+    perdida = (torch.sigmoid(logits) - target) ** 2
+    return _reducir(perdida, reduction)
+
+
+def gradiente_mse(logits, target):
+    """Gradiente analítico de la mse promedio respecto a los logits: 2 (s - y) s (1 - s) / n."""
+    s = torch.sigmoid(logits)
+    return 2 * (s - target) * s * (1 - s) / logits.numel()
+
+
+PERDIDAS = {"bce": bce_con_logits, "mse": mse_con_logits}
 
 
 def get_loss(name):

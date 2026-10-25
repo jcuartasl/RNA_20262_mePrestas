@@ -3,20 +3,13 @@ import os
 import random
 import numpy as np
 
+os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")  # para reproducibilidad en GPU (PyTorch)
 
 def set_seed(seed: int, deterministic: bool = True) -> None:
     """Fija la semilla en Python, NumPy y en el framework de redes si está instalado."""
     os.environ["PYTHONHASHSEED"] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
-
-    try:
-        import tensorflow as tf
-        tf.random.set_seed(seed)
-        if deterministic:
-            tf.config.experimental.enable_op_determinism()
-    except ImportError:
-        pass
 
     try:
         import torch

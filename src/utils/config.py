@@ -8,10 +8,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PATH = ROOT / "configs" / "default.yaml"
 
+_LITERALS = {
+    "true": True,
+    "false": False,
+    "none": None,
+    "null": None,
+}
 
 def _parse(value: str):
     """Convierte '0.001' -> float, '[64,32]' -> lista, 'relu' -> str."""
+    value = value.strip()
     try:
+        if value.lower() in _LITERALS:
+            return _LITERALS[value.lower()]
         return ast.literal_eval(value)
     except (ValueError, SyntaxError):
         return value
@@ -44,5 +53,7 @@ def load_config(path: str, overrides=None, default_path: str = DEFAULT_PATH) -> 
         *parents, last = key.split(".")
         for k in parents:
             node = node.setdefault(k, {})
+            if not isinstance(node, dict):
+                raise ValueError(f"Override inválido: {key}={value} (no es un diccionario en {k})")
         node[last] = _parse(value)
     return cfg

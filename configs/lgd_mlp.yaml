@@ -1,0 +1,14 @@
+train:
+  lr: 0.001
+  epochs: 100
+  batch_size: 256
+
+model:
+  hidden: [64, 32]
+  dropout: 0.2
+  activation: relu
+
+loss:
+  name: mse
+
+output: sigmoid

@@ -1,0 +1,4 @@
+base_score: 0.5
+pdo: 50
+base_odds: 0.05
+n_bins: 10

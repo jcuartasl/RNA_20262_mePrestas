@@ -1,0 +1,11 @@
+data:
+  scheme: temporal          # misma partición que la red de PD (P2)
+
+model:
+  max_iter: 1000
+
+search:
+  # 13 valores de C en escala logarítmica entre 1e-4 y 1e2; lambda = 1 / (n * C)
+  C: [1.0e-4, 3.16e-4, 1.0e-3, 3.16e-3, 1.0e-2, 3.16e-2, 0.1, 0.316, 1.0, 3.16, 10.0, 31.6, 100.0]
+  l1_ratio: [0.0, 1.0]      # 0 = l2 (lbfgs), 1 = l1 (saga)
+  unpenalized: true         # agrega C = inf como referencia sin penalización

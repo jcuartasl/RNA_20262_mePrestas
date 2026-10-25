@@ -1,0 +1,298 @@
+"""Pruebas de src/models/losses.py: valores de referencia, gradientes y estabilidad numérica."""
+import numpy as np
+import pytest
+import torch
+import torch.nn.functional as F
+from scipy.stats import beta as dist_beta
+
+from src.models.losses import (bce_con_logits, bce_fraccional_con_logits, beta_con_logits, get_loss,
+                               gradiente_bce, gradiente_beta, gradiente_mse, mse_con_logits,
+                               penalizacion_l1, penalizacion_l2)
+from src.models.mlp import build_mlp
+
+
+def datos_bce(n=50, seed=0):
+    g = torch.Generator().manual_seed(seed)
+    logits = 3 * torch.randn(n, generator=g, dtype=torch.float64)
+    target = torch.randint(0, 2, (n,), generator=g).double()
+    return logits, target
+
+
+@pytest.mark.parametrize("reduction", ["mean", "sum", "none"])
+def test_bce_contra_pytorch(reduction):
+    logits, target = datos_bce()
+    esperado = F.binary_cross_entropy_with_logits(logits, target, reduction=reduction)
+    torch.testing.assert_close(bce_con_logits(logits, target, reduction), esperado)
+
+
+def test_bce_valor_en_cero():
+    # con z=0 el modelo dice 50 %, así que la pérdida es -log(0.5) = log 2 sea y 0 o 1
+    logits, target = torch.zeros(2, dtype=torch.float64), torch.tensor([0.0, 1.0], dtype=torch.float64)
+    log2 = torch.tensor(2.0, dtype=torch.float64).log()
+    torch.testing.assert_close(bce_con_logits(logits, target), log2)
+
+
+def test_gradiente_contra_autograd():
+    logits, target = datos_bce()
+    # se agregan dos z=0 exactos porque ahí es donde una forma estable mal escrita rompe el gradiente
+    logits = torch.cat([logits, torch.zeros(2, dtype=torch.float64)]).requires_grad_()
+    target = torch.cat([target, torch.tensor([0.0, 1.0], dtype=torch.float64)])
+    (gradiente,) = torch.autograd.grad(bce_con_logits(logits, target), logits)
+    torch.testing.assert_close(gradiente, gradiente_bce(logits.detach(), target))
+
+
+def test_gradcheck_diferencias_finitas():
+    logits, target = datos_bce(n=10)
+    assert torch.autograd.gradcheck(lambda z: bce_con_logits(z, target), (logits.requires_grad_(),))
+
+
+@pytest.mark.parametrize("z", [50.0, 100.0, -50.0, -100.0])
+def test_bce_estable_con_logits_extremos(z):
+    # float32 a propósito, que es donde aparece el overflow
+    logits, target = torch.full((2,), z, requires_grad=True), torch.tensor([0.0, 1.0])
+    perdida = bce_con_logits(logits, target, reduction="none")
+    perdida.sum().backward()
+    assert torch.isfinite(perdida).all() and torch.isfinite(logits.grad).all()
+    # el ejemplo que el modelo falla paga |z| y el que acierta paga casi 0
+    fallado, acertado = (perdida[0], perdida[1]) if z > 0 else (perdida[1], perdida[0])
+    assert fallado.item() == pytest.approx(abs(z)) and acertado.item() == pytest.approx(0.0, abs=1e-6)
+
+
+def test_bce_ingenua_falla_con_logits_extremos():
+    # por esto existe la forma estable: en float32 sigmoide(-100) da 0 y log(0) = -inf
+    logits, target = torch.tensor([-100.0]), torch.tensor([1.0])
+    sigmoide = torch.sigmoid(logits)
+    ingenua = -(target * torch.log(sigmoide) + (1 - target) * torch.log(1 - sigmoide))
+    assert torch.isinf(ingenua).all() and torch.isfinite(bce_con_logits(logits, target))
+
+
+def test_bce_rechaza_entradas_invalidas():
+    with pytest.raises(ValueError): bce_con_logits(torch.zeros(3), torch.zeros(3, 1))
+    with pytest.raises(ValueError): bce_con_logits(torch.zeros(2), torch.tensor([0.0, 0.5]))
+    with pytest.raises(ValueError): bce_con_logits(torch.zeros(2), torch.zeros(2), reduction="media")
+
+
+def datos_lgd(n=50, seed=0):
+    g = torch.Generator().manual_seed(seed)
+    logits = 3 * torch.randn(n, generator=g, dtype=torch.float64)
+    target = torch.rand(n, generator=g, dtype=torch.float64)
+    target[:2] = torch.tensor([0.0, 1.0], dtype=torch.float64)  # la lgd real también trae 0 y 1 exactos
+    return logits, target
+
+
+@pytest.mark.parametrize("reduction", ["mean", "sum", "none"])
+def test_mse_contra_pytorch(reduction):
+    logits, target = datos_lgd()
+    esperado = F.mse_loss(torch.sigmoid(logits), target, reduction=reduction)
+    torch.testing.assert_close(mse_con_logits(logits, target, reduction), esperado)
+
+
+def test_mse_valor_a_mano():
+    # z=0 predice 0.5 y con y=0.7 el error cuadrado es 0.2^2 = 0.04
+    logits, target = torch.zeros(1, dtype=torch.float64), torch.tensor([0.7], dtype=torch.float64)
+    torch.testing.assert_close(mse_con_logits(logits, target), torch.tensor(0.04, dtype=torch.float64))
+
+
+def test_gradiente_mse_contra_autograd():
+    logits, target = datos_lgd()
+    logits.requires_grad_()
+    (gradiente,) = torch.autograd.grad(mse_con_logits(logits, target), logits)
+    torch.testing.assert_close(gradiente, gradiente_mse(logits.detach(), target))
+
+
+def test_gradcheck_mse():
+    logits, target = datos_lgd(n=10)
+    assert torch.autograd.gradcheck(lambda z: mse_con_logits(z, target), (logits.requires_grad_(),))
+
+
+@pytest.mark.parametrize("z", [50.0, -50.0])
+def test_mse_se_satura_con_logits_extremos(z):
+    # la red está muy segura y equivocada (predice ~1 o ~0 con y=0.5) y aun así casi no se corrige,
+    # porque el factor s(1-s) de la regla de la cadena se va a 0; con bce el gradiente sería ~0.5
+    logits, target = torch.tensor([z], requires_grad=True), torch.tensor([0.5])
+    perdida = mse_con_logits(logits, target)
+    perdida.backward()
+    assert torch.isfinite(perdida) and perdida.item() == pytest.approx(0.25)
+    assert logits.grad.abs().item() < 1e-10
+
+
+def test_mse_rechaza_entradas_invalidas():
+    with pytest.raises(ValueError): mse_con_logits(torch.zeros(3), torch.zeros(3, 1))
+    with pytest.raises(ValueError): mse_con_logits(torch.zeros(2), torch.tensor([0.5, 1.5]))
+    with pytest.raises(ValueError): mse_con_logits(torch.zeros(2), torch.tensor([-0.1, 0.5]))
+
+
+@pytest.mark.parametrize("reduction", ["mean", "sum", "none"])
+def test_bce_fraccional_contra_pytorch(reduction):
+    logits, target = datos_lgd()
+    esperado = F.binary_cross_entropy_with_logits(logits, target, reduction=reduction)
+    torch.testing.assert_close(bce_fraccional_con_logits(logits, target, reduction), esperado)
+
+
+def test_bce_fraccional_coincide_con_bce_en_etiquetas_binarias():
+    logits, target = datos_bce()
+    torch.testing.assert_close(bce_fraccional_con_logits(logits, target), bce_con_logits(logits, target))
+
+
+def test_bce_fraccional_minimo_en_y():
+    # si se predice justo y=0.7 el gradiente es 0, pero la pérdida no: queda la entropía H(0.7)
+    y = torch.tensor([0.7], dtype=torch.float64)
+    logits = torch.log(y / (1 - y)).requires_grad_()
+    perdida = bce_fraccional_con_logits(logits, y)
+    (gradiente,) = torch.autograd.grad(perdida, logits)
+    assert perdida.item() == pytest.approx(-(0.7 * np.log(0.7) + 0.3 * np.log(0.3)))
+    assert gradiente.abs().item() < 1e-12
+
+
+def test_bce_fraccional_estima_la_media():
+    # las y vienen de una beta(7, 3), que no es bernoulli; la mejor predicción constante debe ser
+    # la media (0.7) y no la mediana (~0.714) ni la moda (0.75)
+    y = torch.from_numpy(np.random.default_rng(0).beta(7, 3, 20000))
+    m = torch.linspace(0.6, 0.8, 2001, dtype=torch.float64).unsqueeze(1)
+    logits = torch.log(m / (1 - m)).expand(-1, len(y))
+    perdidas = bce_fraccional_con_logits(logits, y.expand(len(m), -1), reduction="none").mean(dim=1)
+    mejor = m[perdidas.argmin()].item()
+    assert mejor == pytest.approx(y.mean().item(), abs=2e-4)
+    assert abs(mejor - y.median().item()) > 0.01
+
+
+def test_gradiente_bce_fraccional_contra_autograd():
+    logits, target = datos_lgd()
+    logits.requires_grad_()
+    (gradiente,) = torch.autograd.grad(bce_fraccional_con_logits(logits, target), logits)
+    torch.testing.assert_close(gradiente, gradiente_bce(logits.detach(), target))
+
+
+def test_gradcheck_bce_fraccional():
+    logits, target = datos_lgd(n=10)
+    perdida = lambda z: bce_fraccional_con_logits(z, target)
+    assert torch.autograd.gradcheck(perdida, (logits.requires_grad_(),))
+
+
+@pytest.mark.parametrize("z", [50.0, -50.0])
+def test_bce_fraccional_no_se_satura_con_logits_extremos(z):
+    # mismo caso que en la mse (segura y equivocada con y=0.5), pero aquí el gradiente sigue en 0.5
+    logits, target = torch.tensor([z], requires_grad=True), torch.tensor([0.5])
+    perdida = bce_fraccional_con_logits(logits, target)
+    perdida.backward()
+    assert torch.isfinite(perdida) and logits.grad.abs().item() == pytest.approx(0.5)
+
+
+def test_bce_fraccional_rechaza_entradas_invalidas():
+    with pytest.raises(ValueError): bce_fraccional_con_logits(torch.zeros(3), torch.zeros(3, 1))
+    with pytest.raises(ValueError): bce_fraccional_con_logits(torch.zeros(2), torch.tensor([0.5, 1.5]))
+    with pytest.raises(ValueError): bce_fraccional_con_logits(torch.zeros(2), torch.tensor([-0.1, 0.5]))
+
+
+def log_phi_de(phi, dtype=torch.float64):
+    return torch.tensor(np.log(phi), dtype=dtype)
+
+
+@pytest.mark.parametrize("reduction", ["mean", "sum", "none"])
+def test_beta_contra_scipy(reduction):
+    logits, target = datos_lgd()
+    mu, y = torch.sigmoid(logits).numpy(), target.clamp(1e-4, 1 - 1e-4).numpy()
+    nll = torch.from_numpy(-dist_beta.logpdf(y, mu * 4, (1 - mu) * 4))
+    esperado = {"mean": nll.mean(), "sum": nll.sum(), "none": nll}[reduction]
+    perdida = beta_con_logits(logits, target, log_phi_de(4), reduction=reduction)
+    torch.testing.assert_close(perdida, esperado)
+
+
+def test_gradiente_beta_contra_autograd():
+    logits, target = datos_lgd()
+    logits, log_phi = logits.requires_grad_(), log_phi_de(4).requires_grad_()
+    d_logits, d_log_phi = torch.autograd.grad(beta_con_logits(logits, target, log_phi), (logits, log_phi))
+    esperado_logits, esperado_log_phi = gradiente_beta(logits.detach(), target, log_phi.detach())
+    torch.testing.assert_close(d_logits, esperado_logits)
+    torch.testing.assert_close(d_log_phi, esperado_log_phi)
+
+
+def test_gradcheck_beta():
+    logits, target = datos_lgd(n=10)
+    perdida = lambda z, r: beta_con_logits(z, target, r)
+    assert torch.autograd.gradcheck(perdida, (logits.requires_grad_(), log_phi_de(4).requires_grad_()))
+
+
+def test_beta_recupera_los_parametros():
+    # si los datos sí vienen de una beta(mu=0.7, phi=4), la máxima verosimilitud debe devolverlos
+    y = torch.from_numpy(np.random.default_rng(0).beta(0.7 * 4, 0.3 * 4, 20000))
+    z, log_phi = torch.zeros(1, dtype=torch.float64, requires_grad=True), log_phi_de(1).requires_grad_()
+    optimizador = torch.optim.LBFGS([z, log_phi], max_iter=200)
+
+    def paso():
+        optimizador.zero_grad()
+        perdida = beta_con_logits(z.expand(len(y)), y, log_phi)
+        perdida.backward()
+        return perdida
+
+    optimizador.step(paso)
+    assert torch.sigmoid(z).item() == pytest.approx(0.7, abs=0.01)
+    assert log_phi.exp().item() == pytest.approx(4, rel=0.05)
+
+
+def test_beta_finita_con_target_0_y_1():
+    logits, target = torch.zeros(2, requires_grad=True), torch.tensor([0.0, 1.0])
+    perdida = beta_con_logits(logits, target, log_phi_de(4, torch.float32))
+    perdida.backward()
+    assert torch.isfinite(perdida) and torch.isfinite(logits.grad).all()
+    # sin el recorte la densidad en 0 y en 1 vale 0, así que la nll es infinita
+    assert np.isinf(-dist_beta.logpdf([0.0, 1.0], 2, 2)).all()
+
+
+@pytest.mark.parametrize("z", [50.0, -50.0])
+def test_beta_no_se_satura_con_logits_extremos(z):
+    # mu(1-mu) se va a 0 pero psi((1-mu) phi) ~ -1/((1-mu) phi) lo compensa y el gradiente queda en 1
+    logits, target = torch.tensor([z], requires_grad=True), torch.tensor([0.5])
+    perdida = beta_con_logits(logits, target, log_phi_de(4, torch.float32))
+    perdida.backward()
+    assert torch.isfinite(perdida) and logits.grad.abs().item() == pytest.approx(1.0, rel=1e-3)
+
+
+@pytest.mark.parametrize("z", [100.0, -100.0])
+def test_beta_finita_con_logits_muy_extremos(z):
+    # en float32 sigmoide(-100) da 0 exacto; sin el piso quedaría lgamma(0) = inf
+    logits, target = torch.tensor([z], requires_grad=True), torch.tensor([0.5])
+    perdida = beta_con_logits(logits, target, log_phi_de(4, torch.float32))
+    perdida.backward()
+    assert torch.isfinite(perdida) and torch.isfinite(logits.grad).all()
+
+
+def test_beta_rechaza_entradas_invalidas():
+    cero = torch.tensor(0.0)
+    with pytest.raises(ValueError): beta_con_logits(torch.zeros(3), torch.zeros(3, 1), cero)
+    with pytest.raises(ValueError): beta_con_logits(torch.zeros(2), torch.tensor([0.5, 1.5]), cero)
+
+
+def mlp_pequeno():
+    torch.manual_seed(0)
+    return build_mlp({"input_dim": 4, "hidden_layers": [3], "dropout": 0.0}).double()
+
+
+def test_penalizaciones_valor_y_sin_sesgos():
+    modelo = mlp_pequeno()
+    w1, w2 = modelo.network[0].weight, modelo.network[2].weight
+    torch.testing.assert_close(penalizacion_l2(modelo), 0.5 * ((w1 ** 2).sum() + (w2 ** 2).sum()))
+    torch.testing.assert_close(penalizacion_l1(modelo), w1.abs().sum() + w2.abs().sum())
+    l2, l1 = penalizacion_l2(modelo).item(), penalizacion_l1(modelo).item()
+    with torch.no_grad():
+        for capa in (modelo.network[0], modelo.network[2]): capa.bias.add_(5.0)
+    assert penalizacion_l2(modelo).item() == l2 and penalizacion_l1(modelo).item() == l1
+
+
+def test_gradiente_de_las_penalizaciones():
+    modelo = mlp_pequeno()
+    penalizacion_l2(modelo).backward()
+    for nombre, p in modelo.named_parameters():
+        if nombre.endswith("bias"): assert p.grad is None
+        else: torch.testing.assert_close(p.grad, p.detach())
+    modelo.zero_grad(set_to_none=True)
+    penalizacion_l1(modelo).backward()
+    for nombre, p in modelo.named_parameters():
+        if not nombre.endswith("bias"): torch.testing.assert_close(p.grad, torch.sign(p.detach()))
+
+
+def test_get_loss():
+    assert get_loss("bce") is bce_fraccional_con_logits
+    assert get_loss("mse") is mse_con_logits
+    assert get_loss("beta") is beta_con_logits
+    with pytest.raises(ValueError): get_loss("hinge")

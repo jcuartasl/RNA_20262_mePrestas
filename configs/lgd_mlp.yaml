@@ -1,7 +1,13 @@
+data:
+  scheme: random            # la temporal tiene censura en las recuperaciones (sección 3.3)
+
 train:
   lr: 0.001
   epochs: 100
   batch_size: 256
+  patience: 10              # parada temprana sobre la pérdida de validación
+  l1: 0.0
+  l2: 0.0
 
 model:
   hidden: [64, 32]
@@ -9,6 +15,5 @@ model:
   activation: relu
 
 loss:
-  name: mse
-
-output: sigmoid
+  name: mse                 # mse | bce | beta; la salida siempre es sigmoide del logit
+  eps: 1.0e-4               # solo beta: recorte de los 0 y 1 exactos

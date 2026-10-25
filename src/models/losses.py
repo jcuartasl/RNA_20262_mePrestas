@@ -50,7 +50,36 @@ def gradiente_mse(logits, target):
     return 2 * (s - target) * s * (1 - s) / logits.numel()
 
 
-PERDIDAS = {"bce": bce_fraccional_con_logits, "mse": mse_con_logits}
+def beta_con_logits(logits, target, log_phi, eps=1e-4, reduction="mean"):
+    """Log-verosimilitud negativa de una beta con media sigmoide(logits) y precisión exp(log_phi)."""
+    if logits.shape != target.shape: raise ValueError("logits y target deben tener la misma forma")
+    if not torch.all((target >= 0) & (target <= 1)): raise ValueError("beta requiere target en [0, 1]")
+    # con y = 0 o 1 exactos log(y) o log(1-y) es -inf, por eso se recorta a [eps, 1 - eps]
+    y = target.clamp(eps, 1 - eps)
+    # 1 - mu se calcula como sigmoide(-z) para no perderlo al restar; el piso evita lgamma(0) = inf
+    piso = torch.finfo(logits.dtype).tiny
+    mu, uno_menos_mu = torch.sigmoid(logits).clamp(min=piso), torch.sigmoid(-logits).clamp(min=piso)
+    phi = torch.exp(log_phi)
+    a, b = mu * phi, uno_menos_mu * phi
+    perdida = (torch.lgamma(a) + torch.lgamma(b) - torch.lgamma(phi)
+               - (a - 1) * torch.log(y) - (b - 1) * torch.log1p(-y))
+    return _reducir(perdida, reduction)
+
+
+def gradiente_beta(logits, target, log_phi, eps=1e-4):
+    """Gradientes analíticos de la nll beta promedio respecto a los logits y a log_phi."""
+    y, n, psi = target.clamp(eps, 1 - eps), logits.numel(), torch.special.digamma
+    mu, phi = torch.sigmoid(logits), torch.exp(log_phi)
+    a, b = mu * phi, (1 - mu) * phi
+    # la beta compara en escala logit: psi(a) - psi(b) es E[logit(Y)] y log(y / (1-y)) es logit(y)
+    d_logits = phi * mu * (1 - mu) * (psi(a) - psi(b) - torch.log(y / (1 - y))) / n
+    d_phi = -psi(phi) + mu * psi(a) + (1 - mu) * psi(b) - mu * torch.log(y) - (1 - mu) * torch.log1p(-y)
+    # regla de la cadena con phi = exp(log_phi): d/d(log_phi) = phi * d/d(phi)
+    d_log_phi = (phi * d_phi).sum().reshape(log_phi.shape) / n
+    return d_logits, d_log_phi
+
+
+PERDIDAS = {"bce": bce_fraccional_con_logits, "mse": mse_con_logits, "beta": beta_con_logits}
 
 
 def get_loss(name):

@@ -1,11 +1,12 @@
 """Pruebas de src/models/losses.py: valores de referencia, gradientes y estabilidad numérica."""
 import numpy as np
 import pytest
+from scipy.stats import beta as dist_beta
 import torch
 import torch.nn.functional as F
 
-from src.models.losses import (bce_con_logits, bce_fraccional_con_logits, get_loss, gradiente_bce,
-                               gradiente_mse, mse_con_logits)
+from src.models.losses import (bce_con_logits, bce_fraccional_con_logits, beta_con_logits, get_loss,
+                               gradiente_bce, gradiente_beta, gradiente_mse, mse_con_logits)
 
 
 def datos_bce(n=50, seed=0):
@@ -181,7 +182,87 @@ def test_bce_fraccional_rechaza_entradas_invalidas():
     with pytest.raises(ValueError): bce_fraccional_con_logits(torch.zeros(2), torch.tensor([-0.1, 0.5]))
 
 
+def log_phi_de(phi, dtype=torch.float64):
+    return torch.tensor(np.log(phi), dtype=dtype)
+
+
+@pytest.mark.parametrize("reduction", ["mean", "sum", "none"])
+def test_beta_contra_scipy(reduction):
+    logits, target = datos_lgd()
+    mu, y = torch.sigmoid(logits).numpy(), target.clamp(1e-4, 1 - 1e-4).numpy()
+    nll = torch.from_numpy(-dist_beta.logpdf(y, mu * 4, (1 - mu) * 4))
+    esperado = {"mean": nll.mean(), "sum": nll.sum(), "none": nll}[reduction]
+    perdida = beta_con_logits(logits, target, log_phi_de(4), reduction=reduction)
+    torch.testing.assert_close(perdida, esperado)
+
+
+def test_gradiente_beta_contra_autograd():
+    logits, target = datos_lgd()
+    logits, log_phi = logits.requires_grad_(), log_phi_de(4).requires_grad_()
+    d_logits, d_log_phi = torch.autograd.grad(beta_con_logits(logits, target, log_phi), (logits, log_phi))
+    esperado_logits, esperado_log_phi = gradiente_beta(logits.detach(), target, log_phi.detach())
+    torch.testing.assert_close(d_logits, esperado_logits)
+    torch.testing.assert_close(d_log_phi, esperado_log_phi)
+
+
+def test_gradcheck_beta():
+    logits, target = datos_lgd(n=10)
+    perdida = lambda z, r: beta_con_logits(z, target, r)
+    assert torch.autograd.gradcheck(perdida, (logits.requires_grad_(), log_phi_de(4).requires_grad_()))
+
+
+def test_beta_recupera_los_parametros():
+    # si los datos sí vienen de una beta(mu=0.7, phi=4), la máxima verosimilitud debe devolverlos
+    y = torch.from_numpy(np.random.default_rng(0).beta(0.7 * 4, 0.3 * 4, 20000))
+    z, log_phi = torch.zeros(1, dtype=torch.float64, requires_grad=True), log_phi_de(1).requires_grad_()
+    optimizador = torch.optim.LBFGS([z, log_phi], max_iter=200)
+
+    def paso():
+        optimizador.zero_grad()
+        perdida = beta_con_logits(z.expand(len(y)), y, log_phi)
+        perdida.backward()
+        return perdida
+
+    optimizador.step(paso)
+    assert torch.sigmoid(z).item() == pytest.approx(0.7, abs=0.01)
+    assert log_phi.exp().item() == pytest.approx(4, rel=0.05)
+
+
+def test_beta_finita_con_target_0_y_1():
+    logits, target = torch.zeros(2, requires_grad=True), torch.tensor([0.0, 1.0])
+    perdida = beta_con_logits(logits, target, log_phi_de(4, torch.float32))
+    perdida.backward()
+    assert torch.isfinite(perdida) and torch.isfinite(logits.grad).all()
+    # sin el recorte la densidad en 0 y en 1 vale 0, así que la nll es infinita
+    assert np.isinf(-dist_beta.logpdf([0.0, 1.0], 2, 2)).all()
+
+
+@pytest.mark.parametrize("z", [50.0, -50.0])
+def test_beta_no_se_satura_con_logits_extremos(z):
+    # mu(1-mu) se va a 0 pero psi((1-mu) phi) ~ -1/((1-mu) phi) lo compensa y el gradiente queda en 1
+    logits, target = torch.tensor([z], requires_grad=True), torch.tensor([0.5])
+    perdida = beta_con_logits(logits, target, log_phi_de(4, torch.float32))
+    perdida.backward()
+    assert torch.isfinite(perdida) and logits.grad.abs().item() == pytest.approx(1.0, rel=1e-3)
+
+
+@pytest.mark.parametrize("z", [100.0, -100.0])
+def test_beta_finita_con_logits_muy_extremos(z):
+    # en float32 sigmoide(-100) da 0 exacto; sin el piso quedaría lgamma(0) = inf
+    logits, target = torch.tensor([z], requires_grad=True), torch.tensor([0.5])
+    perdida = beta_con_logits(logits, target, log_phi_de(4, torch.float32))
+    perdida.backward()
+    assert torch.isfinite(perdida) and torch.isfinite(logits.grad).all()
+
+
+def test_beta_rechaza_entradas_invalidas():
+    cero = torch.tensor(0.0)
+    with pytest.raises(ValueError): beta_con_logits(torch.zeros(3), torch.zeros(3, 1), cero)
+    with pytest.raises(ValueError): beta_con_logits(torch.zeros(2), torch.tensor([0.5, 1.5]), cero)
+
+
 def test_get_loss():
     assert get_loss("bce") is bce_fraccional_con_logits
     assert get_loss("mse") is mse_con_logits
+    assert get_loss("beta") is beta_con_logits
     with pytest.raises(ValueError): get_loss("hinge")

@@ -1,0 +1,9 @@
+# Evaluación final de LGD en test temporal (2015) (P4).
+# Por ahora solo el lineal; cuando P3 entregue la red temporal, se agrega su archivo de predicciones.
+eval_lgd:
+  scheme: temporal
+  split: test
+  n_bins: 10
+  figura_seed: 0
+  predicciones:
+    lineal: results/tables/lgd_pred_test_temporal_lineal.csv.gz

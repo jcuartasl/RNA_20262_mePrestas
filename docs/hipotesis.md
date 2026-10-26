@@ -42,7 +42,7 @@
 | H2 | No confirmada en la magnitud planteada | Razón 1,46 (IC 1,41–1,50) / 1,30 (IC 1,21–1,39): más riesgo, pero por debajo del umbral de 1,5 | 7.ª (0,008); dirección positiva |
 | H3 | Parcialmente confirmada | `revol_util` > 80 %: razón 1,33 / 1,49. La tasa crece de forma casi monótona entre deciles (11,6 % a 24,9 %), con los mayores saltos en utilizaciones bajas y sin aceleración cerca del límite. No linealidad: LR = 26,1 (p = 2·10⁻⁶) en train, con efecto pequeño; no significativa en test (p = 0,26) | 2.ª (0,028), solo detrás del plazo |
 | H4 | No confirmada (inestable) | Train: 18,5 % vs. 19,7 % (razón 0,94; IC 0,90–0,98), dirección contraria. Test: 29,2 % vs. 21,7 % (razón 1,34; IC 1,25–1,44) | 15.ª (0,003), entre las menos importantes |
-| H5 | Confirmada | LGD media 0,676 vs. 0,582 (diferencia 0,094; IC 0,083–0,104) / 0,921 vs. 0,884 (diferencia 0,037; IC 0,027–0,047) | Pendiente: interpretabilidad del modelo de LGD |
+| H5 | Confirmada | LGD media 0,676 vs. 0,582 (diferencia 0,094; IC 0,083–0,104) / 0,921 vs. 0,884 (diferencia 0,037; IC 0,027–0,047) | Débil: con la red de LGD, `monto_total` aumenta el RMSE en solo 0,0012 al permutarse (0,0003 en el lineal), frente a 0,026 del plazo (`term`), la variable dominante |
 
 **Notas.**
 
@@ -51,4 +51,5 @@
 - Los contrastes descriptivos son marginales: comparan una variable a la vez sin controlar por las demás (por ejemplo, el DTI se relaciona con el plazo y el propósito). La importancia por permutación aporta la visión condicional dentro del modelo.
 - En la importancia por permutación, `loan_amnt`, `funded_amnt` y `funded_amnt_inv` se permutan juntas: permutadas por separado, el modelo extrapola a combinaciones imposibles y su importancia se infla artificialmente.
 - La LGD media de 2015 (≈0,9) refleja recuperaciones aún incompletas (censura), limitación ya descrita en la construcción de la LGD.
-- Pendiente: repetir la evidencia del modelo con la red neuronal de PD (P2), en particular la forma de la relación con `revol_util`.
+- Con la red neuronal de PD (P2), `revol_util` pasa a ser la variable más importante (caída de AUC 0,041), seguida del plazo y del ingreso; refuerza la parte de H3 sobre la fuerza del predictor. `emp_length` (H4) sigue fuera de las variables importantes (`results/tables/p4_importancia_pd_mlp_test_temporal.csv`).
+- H5: el efecto del monto sobre la LGD es claro de forma marginal, pero pequeño una vez que el modelo considera el plazo y las demás variables. Entre los créditos incumplidos, el 66,5 % de los de más de 25 000 USD es a 60 meses, frente al 5,8 % de los de menos de 5 000 USD; buena parte de la diferencia marginal refleja, por tanto, el plazo (`results/tables/p4_importancia_lgd_mlp_bce_seed0_test_random.csv`).

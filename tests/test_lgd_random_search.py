@@ -1,9 +1,12 @@
 """Pruebas de src/search/lgd_random_search.py con datos sintéticos y pocas épocas."""
+import numpy as np
 import pandas as pd
 
-from src.search.lgd_random_search import (PERDIDAS, buscar_lgd, config_de_fila, configurar,
-                                          escribir_config_final, mejor_por_perdida, muestrear_configuraciones,
-                                          resumir_semillas, semillas_de_config)
+from src.models.lgd_mlp import entrenar_lgd_mlp, predecir_lgd
+from src.search.lgd_random_search import (PERDIDAS, buscar_lgd, calibracion_por_decil, config_de_fila,
+                                          configurar, escribir_config_final, mejor_por_perdida,
+                                          muestrear_configuraciones, resumir_semillas, semillas_de_config,
+                                          techo_tanh)
 from src.utils.config import load_config
 from tests.test_lgd_mlp import datos_sinteticos
 
@@ -66,3 +69,25 @@ def test_semillas_de_config_y_resumen(tmp_path):
     assert resumen["rmse_mejor"] == tabla["rmse"].min() and resumen["rmse_peor"] == tabla["rmse"].max()
     assert resumen["r2_mejor"] == tabla["r2"].max() and resumen["n_semillas"] == 3
     assert abs(resumen["rmse_sd"] - tabla["rmse"].std()) < 1e-12
+
+
+def test_techo_tanh_acota_las_predicciones():
+    # con tanh en la última capa oculta ninguna predicción puede superar sigmoide(b + suma |w|)
+    d = datos()
+    cfg = configurar(BASE, {"hidden": [16], "activation": "tanh", "dropout": 0.0, "lr": 1e-2, "l2": 0.0}, "bce")
+    modelo, _, _ = entrenar_lgd_mlp(d["X_train"], d["y_train"], d["X_val"], d["y_val"], cfg)
+    X_extremo = np.vstack([d["X_val"], 100 * d["X_val"]])     # entradas absurdas para empujar al techo
+    assert predecir_lgd(modelo, X_extremo).max() <= techo_tanh(modelo) + 1e-6
+
+
+def test_calibracion_por_decil():
+    p = np.linspace(0, 1, 100)
+    tabla = calibracion_por_decil(p, p)
+    assert len(tabla) == 10 and (tabla["n"] == 10).all()
+    np.testing.assert_allclose(tabla["media_pred"], tabla["media_obs"])
+
+
+def test_semillas_de_config_usa_el_nombre_de_experimento_dado(tmp_path):
+    cfg = configurar(BASE, {"hidden": [8], "activation": "relu", "dropout": 0.0, "lr": 1e-2, "l2": 0.0}, "bce")
+    semillas_de_config(datos(), cfg, [0], ruta_log=tmp_path / "log.csv", experimento="lgd_mlp_relu")
+    assert list(pd.read_csv(tmp_path / "log.csv")["experiment"]) == ["lgd_mlp_relu"]

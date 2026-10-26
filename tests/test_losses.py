@@ -303,3 +303,12 @@ def test_gradiente_beta_finito_con_logits_muy_extremos(z):
     # sin el piso, en float32 uno de los dos parámetros de la beta vale 0 y digamma(0) da nan
     d_logits, d_log_phi = gradiente_beta(torch.tensor([z]), torch.tensor([0.5]), log_phi_de(4, torch.float32))
     assert torch.isfinite(d_logits).all() and torch.isfinite(d_log_phi).all()
+
+
+def test_gradiente_beta_coincide_con_autograd_donde_actua_el_piso():
+    # con z = -90 en float32 sigmoide(z) ~ 8e-40 queda bajo el piso: autograd no pasa gradiente por ese término
+    logits, target = torch.tensor([-90.0, 0.5, 3.0], requires_grad=True), torch.tensor([0.5, 0.3, 0.9])
+    log_phi = log_phi_de(4, torch.float32)
+    (d_auto,) = torch.autograd.grad(beta_con_logits(logits, target, log_phi), logits)
+    d_logits, _ = gradiente_beta(logits.detach(), target, log_phi)
+    torch.testing.assert_close(d_logits, d_auto)

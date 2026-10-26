@@ -71,11 +71,15 @@ def gradiente_beta(logits, target, log_phi, eps=1e-4):
     y, n, psi = target.clamp(eps, 1 - eps), logits.numel(), torch.special.digamma
     # el mismo piso que en beta_con_logits: con logits extremos b = 0 y psi(0) daría nan
     piso = torch.finfo(logits.dtype).tiny
-    mu, uno_menos_mu = torch.sigmoid(logits).clamp(min=piso), torch.sigmoid(-logits).clamp(min=piso)
+    s, s_neg = torch.sigmoid(logits), torch.sigmoid(-logits)
+    mu, uno_menos_mu = s.clamp(min=piso), s_neg.clamp(min=piso)
     phi = torch.exp(log_phi)
     a, b = mu * phi, uno_menos_mu * phi
-    # la beta compara en escala logit: psi(a) - psi(b) es E[logit(Y)] y log(y / (1-y)) es logit(y)
-    d_logits = phi * mu * uno_menos_mu * (psi(a) - psi(b) - torch.log(y / (1 - y))) / n
+    # término a término: (psi(a) - log y) - (psi(b) - log(1-y)) = psi(a) - psi(b) - logit(y), y bajo el
+    # modelo beta psi(a) - psi(b) es E[logit(Y)]; donde actúa el piso el clamp corta el gradiente
+    vivo_a, vivo_b = (s > piso).to(s.dtype), (s_neg > piso).to(s.dtype)
+    d_logits = phi * mu * uno_menos_mu * ((psi(a) - torch.log(y)) * vivo_a
+                                          - (psi(b) - torch.log1p(-y)) * vivo_b) / n
     d_phi = -psi(phi) + mu * psi(a) + uno_menos_mu * psi(b) - mu * torch.log(y) - uno_menos_mu * torch.log1p(-y)
     # regla de la cadena con phi = exp(log_phi): d/d(log_phi) = phi * d/d(phi)
     d_log_phi = (phi * d_phi).sum().reshape(log_phi.shape) / n

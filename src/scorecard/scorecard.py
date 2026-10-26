@@ -10,9 +10,6 @@ from dataclasses import dataclass
 
 import numpy as np
 
-EPS = 1e-12
-
-
 @dataclass(frozen=True)
 class Scorecard:
     puntaje_base: float = 600.0
@@ -40,8 +37,9 @@ class Scorecard:
         return self.offset - self.factor * np.asarray(z, dtype=float)
 
     def puntaje_desde_pd(self, p):
-        p = np.clip(np.asarray(p, dtype=float), EPS, 1.0 - EPS)
-        return self.offset + self.factor * np.log((1.0 - p) / p)
+        """Preferir puntaje_desde_logit: con PD muy cercanas a 0 o 1 la PD pierde precisión numérica."""
+        p = np.clip(np.asarray(p, dtype=float), np.finfo(float).tiny, np.nextafter(1.0, 0.0))
+        return self.offset + self.factor * (np.log1p(-p) - np.log(p))
 
     def pd_desde_puntaje(self, puntaje):
         z = (self.offset - np.asarray(puntaje, dtype=float)) / self.factor

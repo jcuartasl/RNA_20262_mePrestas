@@ -71,3 +71,15 @@ def test_percentil():
     assert np.allclose(percentil([1, 101], ref), [0, 100])
     with pytest.raises(ValueError):
         percentil(10, [])
+
+
+def test_logit_y_pd_coinciden_con_valores_extremos():
+    """Regresión: recortar la PD a 1e-12 desviaba el puntaje hasta 800 puntos con logits de -55."""
+    z = np.linspace(-50, 20, 141)
+    p = 1 / (1 + np.exp(-z))
+    assert np.allclose(SC.puntaje_desde_pd(p), SC.puntaje_desde_logit(z), atol=1e-6)
+
+
+def test_pd_exactamente_cero_o_uno_no_rompe():
+    s = SC.puntaje_desde_pd(np.array([0.0, 1.0]))
+    assert np.all(np.isfinite(s)) and s[0] > s[1]

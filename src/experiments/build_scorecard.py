@@ -8,6 +8,7 @@ import time
 
 import numpy as np
 import pandas as pd
+import yaml
 
 from src.data import load_splits
 from src.evaluation.metrics import metricas_pd
@@ -82,7 +83,15 @@ def figura_scorecard(y, s, bandas, ruta, titulo):
     plt.close(fig)
 
 
+def completar_config(cfg: dict) -> dict:
+    """Completa con configs/scorecard.yaml las claves que falten (por ejemplo, cuando la llama demo.py)."""
+    with open(ROOT / "configs" / "scorecard.yaml", encoding="utf-8") as f:
+        base = yaml.safe_load(f)
+    return {**base, **cfg}
+
+
 def run(cfg: dict) -> dict:
+    cfg = completar_config(cfg)
     sc = Scorecard.desde_config(cfg)
     logit, variables, modelo = cargar_modelo_pd(cfg)
     d = load_splits("pd", cfg.get("scheme", "temporal"))

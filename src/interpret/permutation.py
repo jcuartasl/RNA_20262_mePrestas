@@ -57,7 +57,7 @@ def importancia_permutacion(predecir, X, y, grupos, metrica=auc, n_repeticiones=
     return tabla
 
 
-def figura_importancia(tabla, ruta, titulo, top=20):
+def figura_importancia(tabla, ruta, titulo, top=20, etiqueta="caída de AUC al permutar (media ± sd)"):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -66,7 +66,7 @@ def figura_importancia(tabla, ruta, titulo, top=20):
     fig, ax = plt.subplots(figsize=(7, 0.35 * len(t) + 1.5))
     ax.barh(t["variable"], t["importancia_media"], xerr=t["importancia_sd"], alpha=0.8)
     ax.axvline(0, color="k", linewidth=0.8)
-    ax.set(xlabel="caída de AUC al permutar (media ± sd)", title=titulo)
+    ax.set(xlabel=etiqueta, title=titulo)
     fig.tight_layout()
     fig.savefig(ruta, dpi=150)
     plt.close(fig)

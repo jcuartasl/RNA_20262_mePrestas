@@ -1,0 +1,8 @@
+# Importancia por permutación de LGD (P4): aumento de RMSE al permutar.
+scheme: random
+split: test
+semilla_red: 0            # red final BCE de P3 (models/lgd_mlp_seed0.pt)
+incluir_lineal: true      # baseline lineal de P2, para comparar
+n_repeticiones: 10
+grupos_extra:
+  monto_total: [loan_amnt, funded_amnt, funded_amnt_inv]   # casi idénticas: se permutan juntas

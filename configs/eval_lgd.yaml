@@ -1,0 +1,11 @@
+# Evaluación de LGD sobre predicciones guardadas por semilla (P4).
+# Cada archivo de predicciones: una fila por crédito (mismo orden que el split) y una columna seedN por semilla.
+eval_lgd:
+  scheme: random          # random | temporal
+  split: val              # val | test
+  n_bins: 10
+  figura_seed: 0          # semilla que se grafica
+  predicciones:
+    mlp_mse: results/tables/lgd_pred_val_mse.csv.gz
+    mlp_bce: results/tables/lgd_pred_val_bce.csv.gz
+    mlp_beta: results/tables/lgd_pred_val_beta.csv.gz

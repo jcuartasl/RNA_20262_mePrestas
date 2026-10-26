@@ -24,13 +24,13 @@ El puntaje es lineal en el logaritmo de las odds: $S = A + B\ln o$. Se fijan tre
 puntaje base $S_0$, las odds de referencia $O_0$ que le corresponden y los puntos para duplicar las odds
 (PDO). Imponiendo
 
-$$S_0 = A + B\ln O_0, \qquad S_0 + \text{PDO} = A + B\ln(2\,O_0),$$
+$$S_0 = A + B\ln O_0, \qquad S_0 + \text{PDO} = A + B\ln(2\thinspace O_0),$$
 
 y restando ambas ecuaciones se obtiene $\text{PDO} = B\ln 2$. Por tanto
 
-$$B = \frac{\text{PDO}}{\ln 2}\ \ (\text{factor}), \qquad A = S_0 - B\ln O_0\ \ (\text{offset}), \qquad S = A - B\,z.$$
+$$B = \frac{\text{PDO}}{\ln 2}\quad (\text{factor}), \qquad A = S_0 - B\ln O_0\quad (\text{offset}), \qquad S = A - B\thinspace z.$$
 
-Con $S_0 = 600$, $O_0 = 50$ (es decir, PD $= 1/51 \approx 1{,}96\,\%$) y PDO $= 20$: $B = 28{,}8539$ y
+Con $S_0 = 600$, $O_0 = 50$ (es decir, PD $= 1/51 \approx 1{,}96\thinspace \%$) y PDO $= 20$: $B = 28{,}8539$ y
 $A = 487{,}1229$ (Tabla 3.7.1). Una persona con la tasa de incumplimiento media del entrenamiento
 (PD $\approx 0{,}19$, odds $\approx 4{,}2$) obtiene unos 528 puntos.
 
@@ -62,7 +62,7 @@ que con odds de buen pagador corresponde a una PD de 0,95 en el puntaje base, un
 
 **Regresión logística.** Con $z = \beta_0 + \sum_j \beta_j x_j$,
 
-$$S = \underbrace{(A - B\beta_0)}_{\text{puntos base}} + \sum_j \underbrace{(-B\,\beta_j\,x_j)}_{\text{puntos de la variable } j},$$
+$$S = \underbrace{(A - B\beta_0)}_{\text{puntos base}} + \sum_j \underbrace{(-B\thinspace \beta_j\thinspace x_j)}_{\text{puntos de la variable } j},$$
 
 de modo que cada variable aporta $-B\beta_j$ puntos por unidad; con variables estandarizadas, por cada
 desviación estándar. La scorecard admite así variables continuas sin agruparlas en tramos. La
@@ -74,13 +74,13 @@ parte del intercepto, por lo que sus puntos individuales no son interpretables.
 **Red neuronal.** Si $f(x)$ es la salida de la red antes de la sigmoide (el logit), $S = A - B f(x)$. Para
 repartir el puntaje entre variables se usan valores SHAP calculados en el espacio del logit, que cumplen
 $f(x) = \phi_0 + \sum_j \phi_j(x)$ (Lundberg y Lee, 2017); los puntos de la variable $j$ son
-$-B\,\phi_j(x)$ y los puntos base, $A - B\phi_0$. *Pendiente: requiere el modelo final de la red (P2).*
+$-B\thinspace \phi_j(x)$ y los puntos base, $A - B\phi_0$. *Pendiente: requiere el modelo final de la red (P2).*
 
 ## 5. Percentil
 
 Para un puntaje $s$, el percentil es el porcentaje de la distribución de referencia (los puntajes del
 conjunto de entrenamiento) que queda por debajo:
-$\text{perc}(s) = 100 \cdot \#\{i : s_i^{\text{ref}} < s\} / N_{\text{ref}}$. La referencia se guarda en
+$\text{perc}(s) = 100 \cdot \lvert\lbrace i : s_i^{\text{ref}} \lt s \rbrace\rvert / N_{\text{ref}}$. La referencia se guarda en
 `models/scorecard_referencia_<modelo>.npz` y la interfaz la convierte al espacio del logit, de modo que el
 percentil de una persona no cambia si se modifican el puntaje base o el PDO (`test_percentil_no_depende_de_pdo_ni_base`).
 

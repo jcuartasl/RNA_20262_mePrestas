@@ -128,11 +128,20 @@ verificadas contra diferenciación automática en `src/models/losses.py`.
   predictiva completa; su gradiente no se satura.
 - **En contra:**
   - No admite 0 ni 1 exactos: se recortan a $[\varepsilon, 1-\varepsilon]$ con $\varepsilon = 10^{-4}$
-    (0,66 % de los datos), y esos puntos influyen más cuanto menor es $\varepsilon$.
+    (0,66 % de los datos). Esos puntos entran en la verosimilitud con $\ln\varepsilon$, mucho más que un
+    dato típico ($\ln 0{,}75 = -0{,}29$); en el ajuste sin variables mueven sobre todo $\phi$ (de 4,13
+    con $\varepsilon = 10^{-2}$ a 3,72 con $\varepsilon = 1{,}2\times10^{-5}$) y casi nada la media
+    ajustada (0,6941 a 0,6943).
   - Con $\phi$ constante supone la misma forma de varianza que la BCE fraccional, que se queda corta
     frente a la caída observada (Figura 3.3.3).
-  - Si los datos no siguen una Beta, puede no estimar bien la media: su ecuación de estimación iguala
-    $E[\text{logit}(Y)]$, no $E[Y]$.
+  - **No iguala la media muestral.** Los estadísticos suficientes de la Beta son $\ln y$ y
+    $\ln(1-y)$, no $y$: la máxima verosimilitud elige $(\mu, \phi)$ de modo que
+    $\psi(\alpha)-\psi(\alpha+\beta) = \overline{\ln y}$ y $\psi(\beta)-\psi(\alpha+\beta) =
+    \overline{\ln(1-y)}$, es decir, iguala los log-momentos esperados con los muestrales. Solo si los
+    datos siguen una Beta eso equivale a estimar bien la media. Con datos simulados de una Beta, la media
+    ajustada coincide con la muestral (diferencia +0,0002); con la LGD observada, sin variables, queda
+    0,0096 por debajo (0,6941 frente a 0,7038), con cualquier $\varepsilon$ y también excluyendo los 0 y
+    1 exactos, así que la diferencia se debe a la forma de la distribución y no al recorte.
 
 ---
 

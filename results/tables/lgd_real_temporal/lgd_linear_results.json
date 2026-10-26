@@ -1,0 +1,29 @@
+{
+  "task": "lgd",
+  "model": "linear_regression",
+  "scheme": "temporal",
+  "evaluation_split": "validation",
+  "train_samples": 31527,
+  "validation_samples": 19441,
+  "features": 82,
+  "target_range_train": [
+    0.0,
+    1.0
+  ],
+  "target_range_val": [
+    0.0,
+    1.0
+  ],
+  "metrics": {
+    "mae_clipped": 0.14789249723675038,
+    "rmse_clipped": 0.17423538685870685,
+    "mae_raw": 0.14789386826076892,
+    "rmse_raw": 0.17423639388212678
+  },
+  "parameters": 83,
+  "time_seconds": 0.21412469999631867,
+  "prediction_clipping": [
+    0.0,
+    1.0
+  ]
+}

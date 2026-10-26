@@ -1,0 +1,24 @@
+{
+  "scheme": "temporal",
+  "selection_metric": "validation_bce",
+  "n_trials": 12,
+  "train_samples": 163541,
+  "val_samples": 74154,
+  "n_features": 82,
+  "total_time_seconds": 810.661,
+  "best_bce": 0.5318968296051025,
+  "best_config": {
+    "hidden_layers": [
+      64,
+      32
+    ],
+    "activation": "relu",
+    "dropout": 0.0,
+    "lr": 0.003,
+    "seed": 42,
+    "epochs": 30,
+    "batch_size": 512,
+    "patience": 5,
+    "l2": 0.0001
+  }
+}

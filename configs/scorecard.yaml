@@ -1,4 +1,5 @@
-base_score: 0.5
-pdo: 50
-base_odds: 0.05
+# Scorecard (P4). Odds de BUEN pagador: (1 - PD) / PD.
+base_score: 600   # puntaje con odds_base
+base_odds: 50     # 50:1, equivale a PD = 1/51 ~ 1.96 %
+pdo: 20           # puntos para duplicar las odds
 n_bins: 10

@@ -1,0 +1,9 @@
+# Evaluación de PD (P4): logística vs red, por semilla.
+eval_pd:
+  scheme: temporal
+  split: test             # val | test
+  n_bins: 10
+  modelos:                # se predice con los modelos guardados (una columna por archivo)
+    logreg: {tipo: logreg, rutas: [models/pd_logreg.joblib]}
+    mlp: {tipo: mlp, rutas: [models/pd_temporal_6432_relu_seed42.pt]}
+  predicciones: {}        # alternativa: nombre -> archivo .csv.gz con columnas seedN (reemplaza al modelo del mismo nombre)

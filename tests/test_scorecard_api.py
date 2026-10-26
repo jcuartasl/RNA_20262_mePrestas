@@ -12,7 +12,7 @@ from src.utils.config import ROOT
 
 @pytest.fixture(scope="module")
 def api():
-    return ScorecardAPI.cargar()
+    return ScorecardAPI.cargar(modelo="logreg", ruta_modelo="models/pd_logreg.joblib")
 
 
 @pytest.fixture(scope="module")
@@ -55,7 +55,7 @@ def test_percentil_monotono_y_mediana(api):
 
 
 def test_percentil_no_depende_de_pdo_ni_base(api, datos):
-    otra = ScorecardAPI.cargar(pdo=40, base_score=700)
+    otra = ScorecardAPI.cargar(modelo="logreg", ruta_modelo="models/pd_logreg.joblib", pdo=40, base_score=700)
     X = datos["X_test"][:2000]
     assert np.allclose(api.percentile(api.score(X)[0]), otra.percentile(otra.score(X)[0]), atol=0.01)
 
@@ -78,3 +78,12 @@ def test_categorias(api):
     cats = api.categorias()
     assert "term" in cats and len(cats["term"]) >= 2
     assert set(cats) <= set(api.variables_requeridas)
+
+
+def test_api_con_la_red_de_p2(datos):
+    """La configuración por defecto usa la red final de P2; reproduce su AUC en test temporal."""
+    from src.evaluation.metrics import auc
+    api_red = ScorecardAPI.cargar()
+    puntaje, pd_ = api_red.score(datos["X_test"])
+    assert auc(np.asarray(datos["y_test"]), pd_) == pytest.approx(0.6834, abs=1e-3)
+    assert np.all(np.isfinite(puntaje))

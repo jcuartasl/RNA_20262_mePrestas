@@ -188,9 +188,11 @@ def fase_resumir(base, datos, n_seeds):
     fig.savefig(FIGURAS / "lgd_pred_vs_obs.png", dpi=300)
     plt.close(fig)
 
-    # curva de entrenamiento y validación de la ganadora (la de P2 trae el título de pd fijo)
+    # curva de entrenamiento y validación de la ganadora (la de P2 trae el título de pd fijo); la config
+    # sale de la tabla de búsqueda y no de base, para que un --override no cambie la curva sin notarlo
+    cfg_ganadora = config_de_fila(base, mejores.iloc[0])
     _, _, historial = entrenar_lgd_mlp(datos["X_train"], datos["y_train"], datos["X_val"], datos["y_val"],
-                                       base, semillas[0])
+                                       cfg_ganadora, semillas[0])
     fig, ax = plt.subplots(figsize=(9, 5))
     epocas = range(1, len(historial["train_loss"]) + 1)
     ax.plot(epocas, historial["train_loss"], lw=2, label="entrenamiento (con dropout)")

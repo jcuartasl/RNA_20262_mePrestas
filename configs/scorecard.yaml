@@ -4,5 +4,5 @@ base_odds: 50     # 50:1, equivale a PD = 1/51 ~ 1.96 %
 pdo: 20           # puntos para duplicar las odds
 n_bins: 10        # bandas de puntaje para la tabla de validación
 scheme: temporal  # misma partición que los modelos de PD
-modelo: logreg    # logreg | mlp
-ruta_modelo: models/pd_logreg.joblib
+modelo: mlp       # logreg | mlp (red final de P2, seleccionada para la app)
+ruta_modelo: models/pd_temporal_6432_relu_seed42.pt

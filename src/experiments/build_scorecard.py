@@ -31,7 +31,7 @@ def cargar_modelo_pd(cfg):
 
         def logit(X):
             with torch.no_grad():
-                return red(torch.as_tensor(np.asarray(X, dtype=np.float32))).numpy().ravel()
+                return red(torch.from_numpy(np.array(X, dtype=np.float32))).numpy().ravel()
         return logit, None, None
     raise ValueError("modelo debe ser 'logreg' o 'mlp'")
 

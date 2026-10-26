@@ -296,3 +296,10 @@ def test_get_loss():
     assert get_loss("mse") is mse_con_logits
     assert get_loss("beta") is beta_con_logits
     with pytest.raises(ValueError): get_loss("hinge")
+
+
+@pytest.mark.parametrize("z", [100.0, -100.0])
+def test_gradiente_beta_finito_con_logits_muy_extremos(z):
+    # sin el piso, en float32 uno de los dos parámetros de la beta vale 0 y digamma(0) da nan
+    d_logits, d_log_phi = gradiente_beta(torch.tensor([z]), torch.tensor([0.5]), log_phi_de(4, torch.float32))
+    assert torch.isfinite(d_logits).all() and torch.isfinite(d_log_phi).all()

@@ -69,11 +69,14 @@ def beta_con_logits(logits, target, log_phi, eps=1e-4, reduction="mean"):
 def gradiente_beta(logits, target, log_phi, eps=1e-4):
     """Gradientes analíticos de la nll beta promedio respecto a los logits y a log_phi."""
     y, n, psi = target.clamp(eps, 1 - eps), logits.numel(), torch.special.digamma
-    mu, phi = torch.sigmoid(logits), torch.exp(log_phi)
-    a, b = mu * phi, (1 - mu) * phi
+    # el mismo piso que en beta_con_logits: con logits extremos b = 0 y psi(0) daría nan
+    piso = torch.finfo(logits.dtype).tiny
+    mu, uno_menos_mu = torch.sigmoid(logits).clamp(min=piso), torch.sigmoid(-logits).clamp(min=piso)
+    phi = torch.exp(log_phi)
+    a, b = mu * phi, uno_menos_mu * phi
     # la beta compara en escala logit: psi(a) - psi(b) es E[logit(Y)] y log(y / (1-y)) es logit(y)
-    d_logits = phi * mu * (1 - mu) * (psi(a) - psi(b) - torch.log(y / (1 - y))) / n
-    d_phi = -psi(phi) + mu * psi(a) + (1 - mu) * psi(b) - mu * torch.log(y) - (1 - mu) * torch.log1p(-y)
+    d_logits = phi * mu * uno_menos_mu * (psi(a) - psi(b) - torch.log(y / (1 - y))) / n
+    d_phi = -psi(phi) + mu * psi(a) + uno_menos_mu * psi(b) - mu * torch.log(y) - uno_menos_mu * torch.log1p(-y)
     # regla de la cadena con phi = exp(log_phi): d/d(log_phi) = phi * d/d(phi)
     d_log_phi = (phi * d_phi).sum().reshape(log_phi.shape) / n
     return d_logits, d_log_phi

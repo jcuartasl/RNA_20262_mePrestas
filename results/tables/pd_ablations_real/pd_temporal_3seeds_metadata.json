@@ -1,0 +1,59 @@
+{
+  "task": "pd",
+  "scheme": "temporal",
+  "n_seeds": 3,
+  "seed_values": [
+    0,
+    1,
+    2
+  ],
+  "train_samples": 163541,
+  "val_samples": 74154,
+  "features": 82,
+  "base_config": {
+    "hidden_layers": [
+      64,
+      32
+    ],
+    "activation": "relu",
+    "dropout": 0.0,
+    "lr": 0.003,
+    "epochs": 30,
+    "batch_size": 512,
+    "patience": 5,
+    "l2": 0.0001
+  },
+  "ablations": {
+    "base": {},
+    "dropout_02": {
+      "dropout": 0.2
+    },
+    "dropout_03": {
+      "dropout": 0.3
+    },
+    "menor_ancho": {
+      "hidden_layers": [
+        32,
+        16
+      ]
+    },
+    "mayor_ancho": {
+      "hidden_layers": [
+        128,
+        64
+      ]
+    },
+    "mayor_profundidad": {
+      "hidden_layers": [
+        64,
+        32,
+        16
+      ]
+    },
+    "activacion_tanh": {
+      "activation": "tanh"
+    }
+  },
+  "total_time_seconds": 1455.258,
+  "evaluation_split": "validation"
+}

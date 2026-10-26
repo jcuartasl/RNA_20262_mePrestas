@@ -6,6 +6,7 @@ import time
 
 import numpy as np
 import pandas as pd
+import torch
 import yaml
 
 import matplotlib
@@ -93,9 +94,10 @@ def escribir_config_final(base, fila, ruta):
         archivo.write(encabezado + yaml.safe_dump(final, sort_keys=False, default_flow_style=None))
 
 
-def semillas_de_config(datos, cfg, semillas, ruta_log=LOG_PATH):
+def semillas_de_config(datos, cfg, semillas, ruta_log=LOG_PATH, experimento=None):
     """Entrena cfg con cada semilla sin guardar modelos; devuelve métricas por semilla y predicciones."""
     perdida, filas, predicciones = cfg["loss"]["name"], [], {}
+    experimento = experimento or f"lgd_mlp_semillas_{perdida}"
     for semilla in semillas:
         inicio = time.perf_counter()
         modelo, log_phi, _ = entrenar_lgd_mlp(datos["X_train"], datos["y_train"], datos["X_val"],
@@ -104,7 +106,7 @@ def semillas_de_config(datos, cfg, semillas, ruta_log=LOG_PATH):
         p = predecir_lgd(modelo, datos["X_val"])
         metricas = {**metricas_lgd(datos["y_val"], p), "sd_pred": float(p.std())}
         n_params = contar_parametros(modelo, log_phi)
-        log_run(f"lgd_mlp_semillas_{perdida}", cfg, semilla, n_params, segundos, metricas, log_path=ruta_log)
+        log_run(experimento, cfg, semilla, n_params, segundos, metricas, log_path=ruta_log)
         filas.append({"semilla": semilla, **metricas, "n_params": n_params, "segundos": round(segundos, 1)})
         predicciones[f"seed{semilla}"] = p
         print(f"[lgd_semillas] {perdida} seed={semilla}: rmse={metricas['rmse']:.5f} ({segundos:.0f} s)")
@@ -203,15 +205,97 @@ def fase_resumir(base, datos, n_seeds):
     return tabla
 
 
+def techo_tanh(modelo):
+    """Máxima lgd que puede predecir un mlp cuya última capa oculta es tanh: sigmoide(b + suma |w|)."""
+    # cada neurona tanh vale entre -1 y 1, así que el logit no puede pasar de b + suma |w_j|
+    salida = modelo.network[-1]
+    return torch.sigmoid(salida.bias + salida.weight.abs().sum()).item()
+
+
+def calibracion_por_decil(y, p):
+    """Media predicha y observada en cada decil de la predicción."""
+    decil = pd.qcut(p, 10, labels=False) + 1
+    tabla = pd.DataFrame({"pred": p, "obs": np.asarray(y, dtype=np.float64), "decil": decil})
+    return tabla.groupby("decil").agg(media_pred=("pred", "mean"), media_obs=("obs", "mean"), n=("obs", "size"))
+
+
+def fase_diagnostico(base, datos, n_seeds=5):
+    """Comprueba si el techo de la tanh sesga las medias: techo, saturación, deciles y la misma red con relu."""
+    semillas, X_val, y_val = base["run_seeds"], datos["X_val"], datos["y_val"]
+    filas = []
+    for semilla in semillas:
+        modelo, _, _ = cargar_lgd_mlp(ROOT / "models" / f"lgd_mlp_seed{semilla}.pt")
+        p = predecir_lgd(modelo, X_val)
+        with torch.no_grad(): ocultas = modelo.network[:-1](torch.tensor(X_val)).numpy()
+        arriba = p >= np.quantile(p, 0.99)
+        filas.append({"semilla": semilla, "techo": techo_tanh(modelo), "max_pred": p.max(),
+                      "saturadas_1pct_superior": np.mean(np.abs(ocultas[arriba]) > 0.99),
+                      "saturadas_resto": np.mean(np.abs(ocultas[~arriba]) > 0.99)})
+    pd.DataFrame(filas).to_csv(TABLAS / "lgd_diagnostico_techo.csv", index=False)
+
+    lineal, _ = train_lgd_linear(datos["X_train"], datos["y_train"], X_val, y_val)
+    predicciones = {"lineal": predict_lgd_linear(lineal, X_val)}
+    for perdida in PERDIDAS:
+        predicciones[perdida] = pd.read_csv(TABLAS / f"lgd_pred_val_{perdida}.csv.gz")["seed0"].to_numpy()
+    deciles = pd.concat({k: calibracion_por_decil(y_val, p) for k, p in predicciones.items()}, axis=1)
+    deciles.to_csv(TABLAS / "lgd_calibracion_deciles.csv")
+    fig, ax = plt.subplots(figsize=(7, 6))
+    for k in predicciones: ax.plot(deciles[k]["media_pred"], deciles[k]["media_obs"], "o-", label=k)
+    ax.plot([0.5, 0.9], [0.5, 0.9], "k--", lw=1, label="calibración perfecta")
+    ax.set(xlabel="LGD media predicha (decil)", ylabel="LGD media observada (decil)",
+           title="Calibración por deciles de la predicción (validación)")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(FIGURAS / "lgd_calibracion_deciles.png", dpi=300)
+    plt.close(fig)
+
+    # misma configuración ganadora pero con relu, que no está acotada: si el techo costara algo, bajaría el rmse
+    cfg_relu = copy.deepcopy(base)
+    cfg_relu["model"]["activation"] = "relu"
+    relu, _ = semillas_de_config(datos, cfg_relu, semillas[:n_seeds], experimento="lgd_mlp_relu")
+    tanh = pd.read_csv(TABLAS / f"lgd_semillas_{base['loss']['name']}.csv").head(n_seeds)
+    comparacion = pd.DataFrame({"semilla": relu["semilla"], "rmse_tanh": tanh["rmse"].to_numpy(),
+                                "rmse_relu": relu["rmse"].to_numpy()})
+    comparacion.to_csv(TABLAS / "lgd_techo_relu.csv", index=False)
+    return pd.DataFrame(filas), deciles, comparacion
+
+
+def fase_temporal(base, n_seeds=5):
+    """Entrena la config final con la partición temporal (train <= 2013) y la evalúa en validación 2014."""
+    # la prueba (2015) no se toca: solo se usan train y validación de la partición temporal
+    datos, cfg = load_splits("lgd", "temporal"), copy.deepcopy(base)
+    cfg.setdefault("data", {})["scheme"] = "temporal"
+    semillas = base["run_seeds"][:n_seeds]
+    tabla, predicciones = semillas_de_config(datos, cfg, semillas, experimento="lgd_mlp_temporal")
+    lineal, _ = train_lgd_linear(datos["X_train"], datos["y_train"], datos["X_val"], datos["y_val"])
+    p_lineal, y_val = predict_lgd_linear(lineal, datos["X_val"]), datos["y_val"].astype(np.float64)
+    filas = [{"modelo": "lineal (P2)", **metricas_lgd(y_val, p_lineal), "media_pred": p_lineal.mean()}]
+    for (_, fila), columna in zip(tabla.iterrows(), predicciones.columns):
+        filas.append({"modelo": f"mlp {base['loss']['name']} {columna}", "rmse": fila["rmse"],
+                      "mae": fila["mae"], "r2": fila["r2"], "media_pred": predicciones[columna].mean()})
+    resultado = pd.DataFrame(filas)
+    resultado["media_obs_val"], resultado["media_obs_train"] = y_val.mean(), float(datos["y_train"].mean())
+    resultado["sesgo"] = resultado["media_pred"] - resultado["media_obs_val"]
+    resultado.to_csv(TABLAS / "lgd_estabilidad_temporal.csv", index=False)
+    return resultado
+
+
 def main():
     parser = build_parser("Búsqueda pareada del MLP de LGD", "configs/lgd_mlp.yaml")
-    parser.add_argument("--fase", choices=["buscar", "semillas", "resumir"], default="buscar")
+    parser.add_argument("--fase", choices=["buscar", "semillas", "resumir", "diagnostico", "temporal"],
+                        default="buscar")
     parser.add_argument("--n_configs", type=int, default=12)
     parser.add_argument("--n_seeds", type=int, default=30)
     args = parser.parse_args()
     base = init_run(args)
     print(f"[lgd_busqueda] fase {args.fase}, config base:", base)
+    if args.fase == "temporal":
+        print(fase_temporal(base).round(4).to_string(index=False))
+        return
     datos = load_splits("lgd", base.get("data", {}).get("scheme", "random"))
+    if args.fase == "diagnostico":
+        for tabla in fase_diagnostico(base, datos): print(tabla.round(4).to_string(), "\n")
+        return
     if args.fase == "semillas": return fase_semillas(base, datos, args.n_seeds)
     if args.fase == "resumir":
         print(fase_resumir(base, datos, args.n_seeds).round(5).to_string(index=False))

@@ -81,3 +81,26 @@ def calibracion_deciles(y, p, n_bins=10):
         .agg(n=("y", "size"), pred_media=("p", "mean"), obs_media=("y", "mean"))
         .reset_index()
     )
+
+
+def figura_calibracion_deciles(y, predicciones, ruta, n_bins=10, titulo="Calibración por deciles"):
+    """Media observada vs predicha por bin de cuantiles de la predicción, para cada modelo."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(5.5, 5))
+    valores = []
+    for nombre, p in predicciones.items():
+        t = calibracion_deciles(y, p, n_bins)
+        ax.plot(t["pred_media"], t["obs_media"], marker="o", linewidth=1.5, label=nombre)
+        valores += list(t["pred_media"]) + list(t["obs_media"])
+    lo, hi = min(valores) - 0.02, max(valores) + 0.02
+    ax.plot([lo, hi], [lo, hi], "k--", linewidth=1, label="identidad")
+    ax.set(xlim=(lo, hi), ylim=(lo, hi), xlabel="predicción media del bin",
+           ylabel="valor observado medio del bin", title=titulo)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(ruta, dpi=150)
+    plt.close(fig)
+    return ruta

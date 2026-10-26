@@ -4,7 +4,8 @@ import pytest
 
 import src.experiments.train_lgd as train_lgd
 from src.models.lgd_mlp import (_opciones, ajustar_beta_marginal, cargar_lgd_mlp, contar_parametros,
-                                entrenar_lgd_mlp, guardar_lgd_mlp, metricas_lgd, predecir_lgd)
+                                entrenar_lgd_mlp, figuras_distribucion_lgd, guardar_lgd_mlp, metricas_lgd,
+                                predecir_lgd)
 
 
 def datos_sinteticos(n=600, seed=0):
@@ -133,3 +134,10 @@ def test_contar_parametros():
     X_train, y_train, X_val, y_val = datos_sinteticos()
     modelo, _, _ = entrenar_lgd_mlp(X_train, y_train, X_val, y_val, cfg_rapida(epochs=1))
     assert contar_parametros(modelo) == 113 and contar_parametros(modelo, log_phi=object()) == 114
+
+
+def test_figuras_crea_la_carpeta_si_no_existe(tmp_path):
+    carpeta = tmp_path / "no" / "existe"
+    figuras_distribucion_lgd(carpeta)
+    nombres = ["lgd_ajuste_beta_normal.png", "lgd_qq_beta_normal.png", "lgd_varianza_por_decil.png"]
+    assert all((carpeta / nombre).exists() for nombre in nombres)

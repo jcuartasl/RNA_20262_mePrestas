@@ -1,5 +1,6 @@
 """MLP de LGD y análisis previo de la distribución de la LGD que justifica la pérdida y la salida."""
 import copy
+from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
@@ -146,6 +147,8 @@ def ajustar_beta_marginal(y, eps=1e-4):
 
 def figuras_distribucion_lgd(carpeta=ROOT / "results" / "figures"):
     """Genera las tres figuras de la sección 3.3 (lgd de train aleatorio) y devuelve las cifras citadas."""
+    carpeta = Path(carpeta)
+    carpeta.mkdir(parents=True, exist_ok=True)
     datos = load_splits("lgd", "random")
     y, n = datos["y_train"].astype(np.float64), len(datos["y_train"])
     mu, phi = ajustar_beta_marginal(y)

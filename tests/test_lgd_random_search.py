@@ -1,0 +1,68 @@
+"""Pruebas de src/search/lgd_random_search.py con datos sintéticos y pocas épocas."""
+import pandas as pd
+
+from src.search.lgd_random_search import (PERDIDAS, buscar_lgd, config_de_fila, configurar,
+                                          escribir_config_final, mejor_por_perdida, muestrear_configuraciones,
+                                          resumir_semillas, semillas_de_config)
+from src.utils.config import load_config
+from tests.test_lgd_mlp import datos_sinteticos
+
+BASE = {"seed": 0, "data": {"scheme": "random"}, "train": {"epochs": 3, "batch_size": 64, "patience": 3},
+        "model": {"hidden": [64, 32], "dropout": 0.2, "activation": "relu"},
+        "loss": {"name": "mse", "eps": 1e-4}}
+
+
+def datos():
+    X_train, y_train, X_val, y_val = datos_sinteticos()
+    return {"X_train": X_train, "y_train": y_train, "X_val": X_val, "y_val": y_val}
+
+
+def test_muestreo_reproducible_y_sin_repetir():
+    a, b = muestrear_configuraciones(12, 90), muestrear_configuraciones(12, 90)
+    assert a == b and len({str(c) for c in a}) == 12
+    assert a != muestrear_configuraciones(12, 91)
+
+
+def test_configurar_no_modifica_la_base_y_respeta_el_esquema_anidado():
+    combinacion = {"hidden": [32], "activation": "tanh", "dropout": 0.1, "lr": 3e-3, "l2": 1e-4}
+    cfg = configurar(BASE, combinacion, "beta")
+    assert cfg["model"]["hidden"] == [32] and cfg["train"]["lr"] == 3e-3 and cfg["loss"]["name"] == "beta"
+    assert cfg["loss"]["eps"] == 1e-4 and cfg["train"]["epochs"] == 3
+    assert BASE["model"]["hidden"] == [64, 32] and BASE["loss"]["name"] == "mse"
+
+
+def test_busqueda_pareada_registra_y_ordena(tmp_path):
+    log = tmp_path / "log.csv"
+    tabla = buscar_lgd(datos(), BASE, n_configs=2, seed=0, ruta_tabla=tmp_path / "busqueda.csv", ruta_log=log)
+    assert len(tabla) == 6 and len(pd.read_csv(log)) == 6 and (tmp_path / "busqueda.csv").exists()
+    # cada combinación aparece exactamente una vez con cada pérdida
+    assert all(sorted(grupo) == sorted(PERDIDAS) for _, grupo in tabla.groupby("config")["perdida"])
+    assert tabla["rmse"].is_monotonic_increasing
+    # la beta tiene un parámetro más (phi) que la mse y la bce con la misma arquitectura
+    por_config = tabla.pivot(index="config", columns="perdida", values="n_params")
+    assert ((por_config["beta"] - por_config["mse"]) == 1).all()
+    assert (por_config["bce"] == por_config["mse"]).all()
+    mejores = mejor_por_perdida(tabla)
+    assert sorted(mejores["perdida"]) == sorted(PERDIDAS) and mejores["rmse"].iloc[0] == tabla["rmse"].min()
+
+
+def test_la_config_final_escrita_reproduce_la_ganadora(tmp_path):
+    tabla = buscar_lgd(datos(), BASE, n_configs=1, seed=0, ruta_log=tmp_path / "log.csv")
+    ganadora = tabla.iloc[0]
+    escribir_config_final(BASE, ganadora, tmp_path / "lgd_mlp.yaml")
+    leida = load_config(str(tmp_path / "lgd_mlp.yaml"))
+    esperada = config_de_fila(BASE, ganadora)
+    for clave in ("data", "train", "model", "loss"): assert leida[clave] == esperada[clave]
+
+
+def test_semillas_de_config_y_resumen(tmp_path):
+    cfg = configurar(BASE, {"hidden": [16], "activation": "relu", "dropout": 0.1, "lr": 1e-2, "l2": 0.0}, "bce")
+    tabla, predicciones = semillas_de_config(datos(), cfg, [0, 1, 2], ruta_log=tmp_path / "log.csv")
+    assert list(tabla["semilla"]) == [0, 1, 2] and list(predicciones.columns) == ["seed0", "seed1", "seed2"]
+    assert len(predicciones) == 200 and len(pd.read_csv(tmp_path / "log.csv")) == 3
+    # con dropout, cada semilla da un resultado distinto
+    assert tabla["rmse"].nunique() == 3
+    resumen = resumir_semillas(tabla)
+    assert resumen["rmse_mejor"] == tabla["rmse"].min() and resumen["rmse_peor"] == tabla["rmse"].max()
+    assert resumen["r2_mejor"] == tabla["r2"].max() and resumen["n_semillas"] == 3
+    assert abs(resumen["rmse_sd"] - tabla["rmse"].std()) < 1e-12

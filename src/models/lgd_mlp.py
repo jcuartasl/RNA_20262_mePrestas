@@ -34,7 +34,7 @@ def _opciones(cfg):
             "l2": float(entrenamiento.get("l2", 0.0))}
 
 
-def entrenar_lgd_mlp(X_train, y_train, X_val, y_val, cfg, seed=0):
+def entrenar_lgd_mlp(X_train, y_train, X_val, y_val, cfg, seed=90):
     """Entrena el mlp de lgd con adam, l1/l2 y parada temprana; devuelve modelo, log_phi e historial."""
     op = _opciones(cfg)
     torch.manual_seed(seed)

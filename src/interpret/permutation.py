@@ -33,7 +33,7 @@ def grupos_por_variable(columnas, variables_originales, grupos_extra=None):
     return grupos
 
 
-def importancia_permutacion(predecir, X, y, grupos, metrica=auc, n_repeticiones=10, seed=0):
+def importancia_permutacion(predecir, X, y, grupos, metrica=auc, n_repeticiones=10, seed=90):
     """predecir: X -> puntaje de riesgo (PD o logit; mayor = más riesgo)."""
     X = np.asarray(X)
     rng = np.random.default_rng(seed)

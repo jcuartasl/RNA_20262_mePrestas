@@ -13,7 +13,7 @@ from src.utils.config import ROOT
 from src.utils.registry import LOG_PATH, log_run
 
 
-def entrenar_logistica(X, y, C, l1_ratio, seed=0, max_iter=1000, tol=1e-4):
+def entrenar_logistica(X, y, C, l1_ratio, seed=90, max_iter=1000, tol=1e-4):
     """Ajusta la logística por máxima verosimilitud con penalización l2 (l1_ratio=0) o l1 (l1_ratio=1)."""
     # lbfgs solo admite l2; saga hace pasos proximales y por eso la l1 deja coeficientes en 0 exacto
     solver = "lbfgs" if l1_ratio == 0 else "saga"
@@ -35,7 +35,7 @@ def _metricas(y, p):
 
 
 def buscar_regularizacion(X_train, y_train, X_val, y_val, rejilla_C, l1_ratios, sin_penalizacion=True,
-                          seed=0, max_iter=1000, ruta_tabla=None, ruta_log=LOG_PATH):
+                          seed=90, max_iter=1000, ruta_tabla=None, ruta_log=LOG_PATH):
     """Entrena cada (C, l1_ratio), registra el presupuesto y devuelve el de menor bce en validación."""
     configs = [(C, l1) for l1 in l1_ratios for C in rejilla_C]
     if sin_penalizacion: configs.append((np.inf, 0.0))

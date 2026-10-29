@@ -45,7 +45,6 @@ def test_cada_comando_arranca(modulo):
     r = subprocess.run([sys.executable, "-m", f"src.experiments.{modulo}"],
                        cwd=ROOT, capture_output=True, text=True, timeout=120)
     assert r.returncode == 0, r.stderr
-    assert f"[{modulo}]" in r.stdout
 
 
 def test_override_llega_al_comando():

@@ -1,3 +1,12 @@
-exposure_col: exposure
+# Pérdida esperada E[L] = PD * LGD * EAD sobre el test temporal (originaciones de test_year).
+test_year: 2015
+exposure_col: funded_amnt   
 lgd_floor: 0.05
 lgd_cap: 1.0
+pd_model: mlp               # mlp | logreg
+pd_model_path: models/pd_temporal_6432_relu_seed42.pt
+pd_logreg_path: models/pd_logreg.joblib
+lgd_scheme: temporal        # temporal (sin fuga para test 2015) | random
+lgd_seed: 90
+# Si lgd_scheme=temporal y no existe models/lgd_mlp_temporal_seed{lgd_seed}.pt, se usa la red aleatoria
+# (con aviso: ese modelo vio créditos 2014-2015 en entrenamiento, así que la EL 2015 queda optimista).

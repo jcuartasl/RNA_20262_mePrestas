@@ -23,7 +23,7 @@ def random_search_pd(
     X_val,
     y_val,
     n_trials=8,
-    seed=42,
+    seed=90,
     output_path="results/tables/pd_search_demo.csv",
 ):
     """

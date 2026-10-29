@@ -21,12 +21,16 @@ def train(cfg: dict, seed: int) -> dict:
     X, y = datos["X_train"], datos["y_train"]
     # la demo entrena con una muestra de train para tardar menos de 2 minutos; validación queda completa
     fraccion = cfg.get("sample_fraction", 1.0)
+    esquema = cfg.get("data", {}).get("scheme", "random")
+
     if fraccion < 1:
         elegidos = np.random.default_rng(seed).choice(len(y), int(len(y) * fraccion), replace=False)
         X, y = X[elegidos], y[elegidos]
+        nombre = f"lgd_mlp_{esquema}_demo_seed{seed}.pt"
+    else: 
+        nombre = f"lgd_mlp_{esquema}_seed{seed}.pt"
     modelo, log_phi, _ = entrenar_lgd_mlp(X, y, datos["X_val"], datos["y_val"], cfg, seed)
-    # con muestra (demo) se guarda con otro nombre para no pisar el modelo entrenado con todos los datos
-    nombre = f"lgd_mlp_demo_seed{seed}.pt" if fraccion < 1 else f"lgd_mlp_seed{seed}.pt"
+
     guardar_lgd_mlp(modelo, log_phi, cfg, ROOT / "models" / nombre)
     metricas = metricas_lgd(datos["y_val"], predecir_lgd(modelo, datos["X_val"]))
     return {"metrics": metricas, "n_params": contar_parametros(modelo, log_phi)}

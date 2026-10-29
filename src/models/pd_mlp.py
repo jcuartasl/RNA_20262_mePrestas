@@ -8,17 +8,7 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.models.mlp import MLP
-
-
-def set_seed(seed: int = 42):
-    """Establece semillas para reproducir experimentos."""
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-
+from src.utils.config import set_seed
 
 def train_pd_mlp(
     X_train,
@@ -36,7 +26,7 @@ def train_pd_mlp(
 
     config = config or {}
 
-    seed = int(config.get("seed", 42))
+    seed = int(config.get("seed"))
     set_seed(seed)
 
     lr = float(config.get("lr", 0.001))

@@ -1,65 +1,50 @@
-"""Predicciones de LGD por semilla con los modelos ya entrenados (sin reentrenar). Responsable: P4.
-
-Usa solo funciones de P3 (cargar_lgd_mlp, predecir_lgd) y de P2 (train_lgd_linear, predict_lgd_linear).
-Uso: python -m src.experiments.predict_lgd --split test
-"""
-import argparse
+"""Entrena la red de LGD (regresión). Responsable: P3."""
 import time
 
 import numpy as np
-import pandas as pd
 
 from src.data import load_splits
-from src.models.lgd_linear import predict_lgd_linear, train_lgd_linear
-from src.models.lgd_mlp import cargar_lgd_mlp, predecir_lgd
+from src.models.lgd_mlp import contar_parametros, entrenar_lgd_mlp, guardar_lgd_mlp, metricas_lgd, predecir_lgd
+from src.utils.cli import build_parser, init_run
 from src.utils.config import ROOT
+from src.utils.registry import log_run
 
-TABLAS = ROOT / "results" / "tables"
-SEMILLAS = range(30)
+
+def train(cfg: dict, seed: int) -> dict:
+    """Contrato: entrena con `seed` y devuelve {"metrics": {...}, "n_params": int}.
+
+    - Entrena solo con los incumplidos (target_lgd definido).
+    - Guarda el modelo con la semilla en el nombre: models/lgd_mlp_seed{seed}.pt (aleatoria) o
+      models/lgd_mlp_temporal_seed{seed}.pt (data.scheme=temporal)
+    - Claves de metrics acordadas: rmse, mae, r2.
+    """
+    datos = load_splits("lgd", cfg.get("data", {}).get("scheme", "random"))
+    X, y = datos["X_train"], datos["y_train"]
+    # la demo entrena con una muestra de train para tardar menos de 2 minutos; validación queda completa
+    fraccion = cfg.get("sample_fraction", 1.0)
+    if fraccion < 1:
+        elegidos = np.random.default_rng(seed).choice(len(y), int(len(y) * fraccion), replace=False)
+        X, y = X[elegidos], y[elegidos]
+    modelo, log_phi, _ = entrenar_lgd_mlp(X, y, datos["X_val"], datos["y_val"], cfg, seed)
+    # con muestra (demo) se guarda con otro nombre para no pisar el modelo entrenado con todos los datos
+    esquema = cfg.get("data", {}).get("scheme", "random")
+    infijo = "" if esquema == "random" else f"_{esquema}"       # temporal -> lgd_mlp_temporal_seed{n}.pt (no pisa las aleatorias)
+    nombre = f"lgd_mlp_demo{infijo}_seed{seed}.pt" if fraccion < 1 else f"lgd_mlp{infijo}_seed{seed}.pt"
+    guardar_lgd_mlp(modelo, log_phi, cfg, ROOT / "models" / nombre)
+    metricas = metricas_lgd(datos["y_val"], predecir_lgd(modelo, datos["X_val"]))
+    return {"metrics": metricas, "n_params": contar_parametros(modelo, log_phi)}
 
 
 def main():
-    p = argparse.ArgumentParser(description="Predicciones de LGD con los modelos guardados")
-    p.add_argument("--split", choices=["val", "test"], default="test")
-    p.add_argument("--scheme", choices=["random", "temporal"], default="random",
-                   help="temporal: solo el lineal; los 30 modelos de red guardados son de la partición aleatoria")
-    args = p.parse_args()
+    args = build_parser("Entrena la red de LGD", "configs/lgd_mlp.yaml").parse_args()
+    cfg = init_run(args)
+    print("[train_lgd] config:", cfg)
     inicio = time.perf_counter()
-    datos = load_splits("lgd", args.scheme)
-
-    X = datos[f"X_{args.split}"]
-    if args.scheme == "random":
-        predecir_red(datos, X, args)
-    else:
-        print("[predict_lgd] partición temporal: solo el lineal (la red temporal la entrena P3)")
-
-    # Baseline lineal de P2 (determinista): una sola columna
-    lineal, _ = train_lgd_linear(datos["X_train"], datos["y_train"], datos["X_val"], datos["y_val"])
-    ruta_lin = TABLAS / f"lgd_pred_{args.split}_{args.scheme}_lineal.csv.gz"
-    pd.DataFrame({"seed0": predict_lgd_linear(lineal, X)}).to_csv(ruta_lin, index=False)
-    print(f"[predict_lgd] {ruta_lin.name}: ({len(X)}, 1)")
-    print(f"[predict_lgd] listo en {time.perf_counter() - inicio:.1f} s")
-
-
-def predecir_red(datos, X, args):
-    # Verificación: cada modelo debe reproducir las predicciones de validación que guardó P3
-    referencia = pd.read_csv(TABLAS / "lgd_pred_val_bce.csv.gz")
-    modelos = {}
-    for s in SEMILLAS:
-        modelo, _, perdida = cargar_lgd_mlp(ROOT / "models" / f"lgd_mlp_seed{s}.pt")
-        if perdida != "bce":
-            raise ValueError(f"seed {s}: se esperaba la red final BCE y el archivo tiene {perdida!r}")
-        dif = np.abs(predecir_lgd(modelo, datos["X_val"]) - referencia[f"seed{s}"].to_numpy()).max()
-        if dif > 1e-4:
-            raise ValueError(f"seed {s}: no reproduce las predicciones de validación de P3 (dif {dif:.2e})")
-        modelos[s] = modelo
-    print("[predict_lgd] los 30 modelos reproducen la validación de P3")
-
-    # Red final BCE: una columna por semilla
-    red = pd.DataFrame({f"seed{s}": predecir_lgd(m, X) for s, m in modelos.items()})
-    ruta_red = TABLAS / f"lgd_pred_{args.split}_{args.scheme}_bce.csv.gz"
-    red.to_csv(ruta_red, index=False)
-    print(f"[predict_lgd] {ruta_red.name}: {red.shape}")
+    salida = train(cfg, cfg["seed"])
+    segundos = time.perf_counter() - inicio
+    log_run("lgd_mlp", cfg, cfg["seed"], salida["n_params"], segundos, salida["metrics"])
+    print(f"[train_lgd] seed={cfg['seed']} {salida['metrics']} n_params={salida['n_params']} "
+          f"({segundos:.1f} s)")
 
 
 if __name__ == "__main__":

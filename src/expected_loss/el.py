@@ -34,16 +34,16 @@ def expected_loss(
     Retorna:
     --------
     dict con métricas agregadas y vector individual:
-        - 'el_individual' : np.ndarray de float32
+        - 'el_individual' : np.ndarray de float64
         - 'el_total'      : float, suma total de pérdidas esperadas ($)
         - 'el_mean'       : float, pérdida esperada promedio por crédito ($)
         - 'el_median'     : float, pérdida esperada mediana ($)
         - 'ead_total'     : float, exposición total agregada de la cartera ($)
         - 'el_rate'       : float, tasa de pérdida esperada (el_total / ead_total)
     """
-    pd_arr = np.asarray(pd_probs, dtype=np.float32)
-    lgd_arr = np.asarray(lgd_values, dtype=np.float32)
-    ead_arr = np.asarray(ead_values, dtype=np.float32)
+    pd_arr = np.asarray(pd_probs, dtype=np.float64)
+    lgd_arr = np.asarray(lgd_values, dtype=np.float64)
+    ead_arr = np.asarray(ead_values, dtype=np.float64)
 
     # Validar dimensiones
     if not (len(pd_arr) == len(lgd_arr) == len(ead_arr)):
@@ -74,7 +74,8 @@ def expected_loss_report(
     pd_probs: Union[np.ndarray, pd.Series],
     lgd_values: Union[np.ndarray, pd.Series],
     ead_values: Union[np.ndarray, pd.Series],
-    figures_dir: Optional[str] = "results/figures"
+    figures_dir: Optional[str] = "results/figures",
+    prefix: str = "",
 ) -> Dict[str, Any]:
     """
     Ejecuta el cálculo de E[L], imprime reporte formateado y genera
@@ -82,7 +83,7 @@ def expected_loss_report(
     """
     results = expected_loss(pd_probs, lgd_values, ead_values)
     el_ind = results["el_individual"]
-    pd_arr = np.asarray(pd_probs, dtype=np.float32)
+    pd_arr = np.asarray(pd_probs, dtype=np.float64)
 
     print("\n" + "="*60)
     print("REPORTE DE PÉRDIDA ESPERADA (EXPECTED LOSS - E[L]):")
@@ -109,7 +110,7 @@ def expected_loss_report(
         plt.legend(frameon=True)
         plt.grid(axis="y", linestyle="--", alpha=0.6)
         plt.tight_layout()
-        fig_dist = os.path.join(figures_dir, "distribucion_el.png")
+        fig_dist = os.path.join(figures_dir, f"{prefix}distribucion_el.png")
         plt.savefig(fig_dist, dpi=300)
         plt.close()
         print(f"Gráfica guardada: {fig_dist}")
@@ -130,7 +131,7 @@ def expected_loss_report(
         plt.grid(axis="y", linestyle="--", alpha=0.6)
         plt.xticks(rotation=45)
         plt.tight_layout()
-        fig_box = os.path.join(figures_dir, "el_por_rango_pd.png")
+        fig_box = os.path.join(figures_dir, f"{prefix}el_por_rango_pd.png")
         plt.savefig(fig_box, dpi=300)
         plt.close()
         print(f"Gráfica guardada: {fig_box}")

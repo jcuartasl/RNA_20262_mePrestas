@@ -53,7 +53,7 @@ pip install -r requirements.txt
 
 ### Cambiar parámetros sin editar código
 ```bash
-python -m src.experiments.train_pd --config configs/pd_mlp.yaml --override lr=0.001 layers=[64,32] dropout=0.2
+python -m src.experiments.train_pd --config configs/pd_mlp.yaml --override train.lr=0.001 model.hidden=[64,32] model.dropout=0.2
 ```
 
 ## Semillas y reproducibilidad

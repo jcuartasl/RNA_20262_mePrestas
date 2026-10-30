@@ -7,12 +7,14 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
+from scipy.special import expit
 from sklearn.datasets import make_classification
+from sklearn.metrics import roc_auc_score
 
 from src.models.losses import get_loss, penalizacion_l2
 from src.models.mlp import build_mlp
-from src.models.pd_logreg import (buscar_regularizacion, cargar_logistica, entrenar_logistica,
-                                  guardar_logistica, predecir_pd_logistica)
+from src.models.pd_logreg import (ajustar_platt, aplicar_platt, buscar_regularizacion, cargar_logistica,
+                                  entrenar_logistica, guardar_logistica, predecir_pd_logistica, recalibrar)
 from src.utils.config import ROOT
 
 
@@ -89,6 +91,31 @@ def test_guardar_y_cargar_da_las_mismas_predicciones(tmp_path):
     cargado, variables = cargar_logistica(tmp_path / "logistica.joblib")
     np.testing.assert_array_equal(predecir_pd_logistica(cargado, X_val), predecir_pd_logistica(modelo, X_val))
     assert variables == [f"x{i}" for i in range(8)]
+
+
+def test_platt_corrige_el_desplazamiento_y_no_cambia_la_auc():
+    # cambio de época simulado: el logit real está 0.6 por encima del que predice el modelo
+    rng = np.random.default_rng(0)
+    z = rng.normal(-1.5, 1.0, 20000)
+    p, y = expit(z), (rng.random(20000) < expit(z + 0.6)).astype(float)
+    a, b = ajustar_platt(p, y)
+    q = aplicar_platt(p, a, b)
+    assert a == pytest.approx(0.6, abs=0.1) and b == pytest.approx(1.0, abs=0.1)
+    # con intercepto sin penalizar, la pd media recalibrada iguala la tasa (como en la sección 5.1)
+    assert q.mean() == pytest.approx(y.mean(), abs=1e-3) and p.mean() < y.mean() - 0.05
+    # b > 0 es una transformación creciente: no cambia el orden ni la auc
+    assert roc_auc_score(y, q) == pytest.approx(roc_auc_score(y, p), abs=1e-12)
+
+
+def test_recalibrar_solo_usa_validacion(tmp_path):
+    X_train, y_train, X_val, y_val = datos_sinteticos()
+    modelo = entrenar_logistica(X_train, y_train, C=1.0, l1_ratio=0.0)
+    datos = {"X_val": X_val, "y_val": y_val, "X_test": X_val[:200], "y_test": y_val[:200]}
+    tabla, a, b = recalibrar(modelo, datos, tmp_path / "platt.csv")
+    assert len(tabla) == 4 and (tmp_path / "platt.csv").exists()
+    # cambiar las etiquetas de prueba no puede mover a ni b
+    datos["y_test"] = 1 - datos["y_test"]
+    assert recalibrar(modelo, datos)[1:] == (a, b)
 
 
 def test_comando_arranca():

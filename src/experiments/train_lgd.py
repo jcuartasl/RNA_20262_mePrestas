@@ -26,11 +26,10 @@ def train(cfg: dict, seed: int) -> dict:
     if fraccion < 1:
         elegidos = np.random.default_rng(seed).choice(len(y), int(len(y) * fraccion), replace=False)
         X, y = X[elegidos], y[elegidos]
-        nombre = f"lgd_mlp_{esquema}_demo_seed{seed}.pt"
-    else: 
-        nombre = f"lgd_mlp_{esquema}_seed{seed}.pt"
+    # la aleatoria conserva el nombre del contrato; las demás particiones llevan su nombre para no pisarla
+    infijo = "" if esquema == "random" else f"_{esquema}"
+    nombre = f"lgd_mlp_demo{infijo}_seed{seed}.pt" if fraccion < 1 else f"lgd_mlp{infijo}_seed{seed}.pt"
     modelo, log_phi, _ = entrenar_lgd_mlp(X, y, datos["X_val"], datos["y_val"], cfg, seed)
-
     guardar_lgd_mlp(modelo, log_phi, cfg, ROOT / "models" / nombre)
     metricas = metricas_lgd(datos["y_val"], predecir_lgd(modelo, datos["X_val"]))
     return {"metrics": metricas, "n_params": contar_parametros(modelo, log_phi)}

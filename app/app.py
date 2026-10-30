@@ -20,7 +20,7 @@ if str(ROOT_LOCAL) not in sys.path:
 from app.servicio import obtener_servicio  # noqa: E402
 
 st.set_page_config(page_title="¿Me prestas? · Riesgo de crédito", page_icon="📊", layout="wide")
-FX = float(os.environ.get("ME_PRESTAS_COP_PER_USD", "4000"))
+FX = float(os.environ.get("ME_PRESTAS_COP_PER_USD", "3140"))
 
 
 @st.cache_resource(show_spinner="Cargando modelos guardados…")

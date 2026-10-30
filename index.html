@@ -710,7 +710,7 @@
     <main>
         <section class="wrap hero">
             <div>
-                <div class="eyebrow">Proyecto · Redes neuronales y datos tabulares</div>
+                <div class="eyebrow">Proyecto · Redes neuronales para datos tabulares</div>
                 <h1>¿Me<br><span>prestas?</span></h1>
                 <p class="lead">Un laboratorio interactivo para explorar cómo se estima el riesgo de crédito. Comparamos
                     un modelo interpretable con una red neuronal y examinamos qué ocurre cuando cambian las
@@ -723,7 +723,7 @@
                     <div class="pixel-top"><span>PERFIL / SIMULADOR</span><span>● MODELOS GUARDADOS</span></div>
                     <div class="score-preview">
                         <div class="big-score" id="heroScore">—<small>PUNTAJE DEL PERFIL</small></div>
-                        <div class="stamp">MODELO<br>REAL</div>
+                        <div class="stamp">LIVE<br>TEST</div>
                     </div>
                     <div class="mini-bars" aria-hidden="true"><i style="--h:24%"></i><i style="--h:38%"></i><i
                             style="--h:31%"></i><i style="--h:54%"></i><i style="--h:45%"></i><i style="--h:68%"></i><i
@@ -734,7 +734,7 @@
                 </div>
             </div>
         </section>
-        <div class="ticker"><span>✳ MODELOS ENTRENADOS DEL PROYECTO &nbsp; ✳ PROTOTIPO ACADÉMICO &nbsp; ✳ PD × LGD × EAD &nbsp; ✳ RESULTADOS LEÍDOS DE results/ &nbsp;</span></div>
+        <div class="ticker"><span>✳ MODELOS ENTRENADOS DEL PROYECTO &nbsp; ✳ PROTOTIPO &nbsp; ✳ PD × LGD × EAD &nbsp; ✳ RESULTADOS LEÍDOS DE results/ &nbsp;</span></div>
         <div class="wrap notice"><b>AVISO</b><span>Prototipo académico. Los modelos se entrenaron con créditos de Lending Club (EE. UU., 2007–2015) y sus montos están en <b>dólares</b>: el formulario pide USD y muestra equivalentes en COP solo como referencia. Los datos opcionales que dejes vacíos se completan con la mediana o moda del entrenamiento y el resultado los lista. No es una decisión real de crédito.</span></div>
         <section class="wrap section" id="simulador">
             <div class="section-head">
@@ -860,7 +860,6 @@
                     <div class="eyebrow">04 — Preguntas del equipo</div>
                     <h2>Hipótesis y veredictos</h2>
                 </div>
-                <p>Veredictos tomados de docs/hipotesis.md; contrastes en results/tables/p4_hipotesis_contraste.csv.</p>
             </div>
             <div class="hypotheses"><article class="hypo"><div class="n">HIPÓTESIS / H1</div><h3>Más deuda, mayor riesgo</h3><p>DTI sobre el percentil 75 frente a DTI menor de 15: tasa de incumplimiento 24,9 % vs 15,8 % (entrenamiento) y 36,2 % vs 19,1 % (2015).</p><span class="status">CONFIRMADA</span></article><article class="hypo"><div class="n">HIPÓTESIS / H3</div><h3>Uso del crédito rotativo</h3><p>Con revol_util mayor de 80 % hay más riesgo, pero la relación es casi lineal y no acelera cerca del límite.</p><span class="status">PARCIALMENTE CONFIRMADA</span></article><article class="hypo"><div class="n">HIPÓTESIS / H2 / H4</div><h3>Consultas recientes y antigüedad laboral</h3><p>H2 queda por debajo del umbral de razón 1,5 y H4 cambia de signo entre muestras (sesgo de madurez en 2015).</p><span class="status">NO CONFIRMADAS</span></article><article class="hypo"><div class="n">HIPÓTESIS / H5</div><h3>El monto agranda la pérdida</h3><p>LGD media 0,676 vs 0,582 entre créditos grandes y pequeños, en buena parte por el plazo.</p><span class="status">CONFIRMADA (efecto pequeño)</span></article></div>
         </section>
@@ -875,6 +874,14 @@
             <div class="panel">
                 <div class="links"><a id="lnkRepo" href="#">REPOSITORIO GIT ↗</a><a id="lnkReport" href="#">REPORTE TÉCNICO ↗</a><a id="lnkVideo" href="#">VIDEO PROMOCIONAL ↗</a></div>
                 <p class="tooltip" id="linksNote" style="margin:20px 0 0">Los enlaces se leen de las variables ME_PRESTAS_REPO_URL, ME_PRESTAS_REPORT_URL y ME_PRESTAS_VIDEO_URL del servidor.</p>
+                <h3>Videos de contribuciones individuales</h3>
+                <div class="links">
+                    <a id="lnkvd1" href="por definir">Contribución Jonhatan ↗</a>
+                    <a id="lnkvd2" href="por definir">Contribución Sebastián ↗</a>
+                    <a id="lnkvd3" href="por definir">Contribución Omar ↗</a>
+                    <a id="lnkvd4" href="por definir">Contribución César ↗</a>
+                    <a id="lnkvd5" href="por definir">Contribución Juan David ↗</a>
+                </div>
             </div>
         </section>
         </main>

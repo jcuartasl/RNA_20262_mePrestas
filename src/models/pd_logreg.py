@@ -4,6 +4,7 @@ import time
 import joblib
 import numpy as np
 import pandas as pd
+from scipy.special import expit, logit
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import brier_score_loss, log_loss, roc_auc_score
 
@@ -59,6 +60,34 @@ def buscar_regularizacion(X_train, y_train, X_val, y_val, rejilla_C, l1_ratios, 
     return mejor, tabla
 
 
+def ajustar_platt(p, y):
+    """Platt: logística sin penalizar de y sobre logit(p); devuelve el intercepto a y la pendiente b."""
+    # la pd llega en float32: sin recortar, una pd de 1.0 exacto daría un logit infinito
+    z = logit(np.clip(p, 1e-7, 1 - 1e-7)).reshape(-1, 1)
+    modelo = entrenar_logistica(z, y, C=np.inf, l1_ratio=0.0)
+    return float(modelo.intercept_[0]), float(modelo.coef_[0, 0])
+
+
+def aplicar_platt(p, a, b):
+    """PD recalibrada: sigmoide(a + b * logit(p))."""
+    return expit(a + b * logit(np.clip(p, 1e-7, 1 - 1e-7)))
+
+
+def recalibrar(modelo, datos, ruta_tabla=None):
+    """Ajusta platt en validación y compara la pd original con la recalibrada en validación y prueba."""
+    # solo validación entra al ajuste; la prueba mide si la corrección se sostiene en el año siguiente
+    a, b = ajustar_platt(predecir_pd_logistica(modelo, datos["X_val"]), datos["y_val"])
+    filas = []
+    for particion in ["val", "test"]:
+        y, p = datos[f"y_{particion}"], predecir_pd_logistica(modelo, datos[f"X_{particion}"])
+        for version, q in [("original", p), ("platt", aplicar_platt(p, a, b))]:
+            filas.append({"particion": particion, "version": version, "pd_media": float(np.mean(q)),
+                          "tasa_real": float(np.mean(y)), **_metricas(y, q), "a": a, "b": b})
+    tabla = pd.DataFrame(filas)
+    if ruta_tabla is not None: tabla.to_csv(ruta_tabla, index=False)
+    return tabla, a, b
+
+
 def guardar_logistica(modelo, variables, ruta):
     """Guarda el modelo junto con los nombres de las variables (los usarán los puntos de la scorecard)."""
     joblib.dump({"modelo": modelo, "variables": list(variables)}, ruta)
@@ -71,10 +100,19 @@ def cargar_logistica(ruta):
 
 
 def main():
-    args = build_parser("Regresión logística de referencia para PD", "configs/pd_logreg.yaml").parse_args()
+    parser = build_parser("Regresión logística de referencia para PD", "configs/pd_logreg.yaml")
+    parser.add_argument("--recalibrar", action="store_true",
+                        help="ajusta platt en validación con el modelo guardado (no reentrena)")
+    args = parser.parse_args()
     cfg = init_run(args)
     print("[pd_logreg] config:", cfg)
     datos, busqueda = load_splits("pd", cfg["data"]["scheme"]), cfg["search"]
+    if args.recalibrar:
+        modelo, _ = cargar_logistica(ROOT / "models" / "pd_logreg.joblib")
+        tabla, a, b = recalibrar(modelo, datos, ROOT / "results" / "tables" / "pd_logreg_platt.csv")
+        print(tabla.round(4).to_string(index=False))
+        print(f"[pd_logreg] platt ajustado en validación: a={a:.4f}, b={b:.4f}")
+        return
     modelo, tabla = buscar_regularizacion(
         datos["X_train"], datos["y_train"], datos["X_val"], datos["y_val"], busqueda["C"],
         busqueda["l1_ratio"], busqueda["unpenalized"], cfg["seed"], cfg["model"]["max_iter"],

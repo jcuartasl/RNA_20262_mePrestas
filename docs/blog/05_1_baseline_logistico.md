@@ -3,14 +3,14 @@
 **Curso:** Redes Neuronales y Algoritmos Bioinspirados  
 **Universidad:** Universidad Nacional de Colombia  
 **Proyecto:** Trabajo 2 — Redes neuronales para datos tabulares (*¿me prestas?*)  
-**Responsable:** P3 · **Revisión:** P2 · **Estado:** borrador para integración
+**Estado:** borrador para integración
 
 > Esta sección presenta el modelo de referencia contra el que se compara la red de PD (sección 5.2): una
 > regresión logística estimada por máxima verosimilitud, con una búsqueda de regularización L1 y L2 con
 > presupuesto declarado. Usa la **partición temporal** de PD, la misma de la red: entrenamiento 2007–2013
 > ($n = 163.541$, tasa de incumplimiento 19,28 %), validación 2014 ($n = 74.154$, 26,22 %) y prueba 2015
-> ($n = 30.835$, 25,46 %), con 82 variables (sección 3.1). La numeración de tablas (5.1.x) es provisional
-> hasta la integración del blog.
+> ($n = 30.835$, 25,46 %), con 82 variables (sección 3.1). La numeración de tablas (5.1.x)
+> y las remisiones a otras secciones, que siguen la estructura de la guía del curso, son provisionales hasta la integración del blog.
 
 ---
 
@@ -22,7 +22,7 @@ entropía cruzada binaria (BCE), como se deriva en la sección 3.3 (apartado 2).
 una penalización sobre los coeficientes $\mathbf{w}$, L2 ($\lVert\mathbf{w}\rVert_2^2$) o L1
 ($\lVert\mathbf{w}\rVert_1$), cuyo efecto se explica en la sección 3.5.
 
-Se usó `LogisticRegression` de scikit-learn, que parametriza la fuerza de la penalización con
+Se usó `LogisticRegression` de scikit-learn (Pedregosa et al., 2011), que parametriza la fuerza de la penalización con
 $C$: un $C$ pequeño es una penalización fuerte, y $C = \infty$ es la logística sin penalizar. En la
 configuración del proyecto se anota la equivalencia $\lambda = 1/(nC)$ con la pérdida promedio. La L2 se
 ajustó con `lbfgs` y la L1 con `saga`, porque `lbfgs` no admite L1. `saga` hace pasos proximales, y por
@@ -38,9 +38,9 @@ La Tabla 5.1.1 resume el espacio de búsqueda y el presupuesto.
 | Penalización | L2 (`lbfgs`) y L1 (`saga`) |
 | Referencia sin penalizar | $C = \infty$ |
 | Configuraciones entrenadas | 27 (13 × 2 + 1), una vez cada una |
-| Tiempo total | 12,6 min (L2: 0,4 min; L1: 12,2 min) |
+| Tiempo total | 5,1 min (L2: 0,2 min; L1: 4,9 min) |
 | Parámetros | 83 (82 coeficientes y el intercepto) |
-| Criterio de selección | menor BCE en la validación temporal (el mismo de la red de P2) |
+| Criterio de selección | menor BCE en la validación temporal (el mismo de la red de PD) |
 
 **Tabla 5.1.1.** Espacio de búsqueda y presupuesto de la logística. *Fuente:* elaboración propia;
 `configs/pd_logreg.yaml`, `src/models/pd_logreg.py` y `results/tables/pd_logreg_busqueda.csv`.
@@ -55,11 +55,11 @@ penalizar y el camino de la L1.
 
 | Penalización | $C$ | BCE validación | AUC validación | Brier | Coeficientes distintos de 0 |
 |---|---|---|---|---|---|
-| **L2 (elegida)** | **0,01** | **0,54219** | **0,68296** | **0,18024** | 81 |
-| L2 | 0,316 | 0,54221 | 0,68279 | 0,18019 | 81 |
-| Sin penalizar | $\infty$ | 0,54224 | 0,68278 | 0,18020 | 81 |
+| **L2 (elegida)** | **0,01** | **0,54246** | **0,68296** | **0,18024** | 81 |
+| L2 | 0,316 | 0,54248 | 0,68279 | 0,18019 | 81 |
+| Sin penalizar | $\infty$ | 0,54252 | 0,68278 | 0,18020 | 81 |
 | L2 | $10^{-4}$ | 0,55074 | 0,68018 | 0,18461 | 81 |
-| L1 | 0,1 | 0,54228 | 0,68280 | 0,18024 | 76 |
+| L1 | 0,1 | 0,54255 | 0,68280 | 0,18024 | 76 |
 | L1 | 0,01 | 0,54312 | 0,68255 | 0,18078 | 34 |
 | L1 | 0,001 | 0,55308 | 0,66919 | 0,18499 | 12 |
 | L1 | $10^{-4}$ | 0,58960 | 0,50000 | 0,19825 | 0 |
@@ -68,10 +68,10 @@ penalizar y el camino de la L1.
 propia; `results/tables/pd_logreg_busqueda.csv` (las 27 filas).
 
 - **La regularización casi no cambia el resultado.** Para todo $C \geq 0{,}003$ con L2, la BCE de
-  validación está entre 0,54219 y 0,54236, y la logística sin penalizar queda a $5\times10^{-5}$ de la
+  validación está entre 0,54246 y 0,54263, y la logística sin penalizar queda a $6\times10^{-5}$ de la
   elegida. Es lo esperable con 163.541 créditos para 83 parámetros: los datos dominan la penalización.
   Las diferencias del orden de $10^{-5}$ ni siquiera son monótonas en $C$ (por ejemplo, $C = 1$ da
-  0,54230, peor que sus vecinos). *Hipótesis:* están dentro de la tolerancia del optimizador
+  0,54257, peor que sus vecinos). *Hipótesis:* están dentro de la tolerancia del optimizador
   ($10^{-4}$) y no deben leerse como una preferencia real por $C = 0{,}01$.
 - **Aun así, la penalización resuelve un problema de identificación.** Las dos columnas de `term`
   (36 y 60 meses) suman 1 en cada crédito, igual que la columna implícita del intercepto. Además, hay tres
@@ -83,7 +83,7 @@ propia; `results/tables/pd_logreg_busqueda.csv` (las 27 filas).
 - **La L1 ofrece un modelo mucho más pequeño a bajo costo.** Con $C = 0{,}01$ conserva 34 de las 82
   variables y pierde solo 0,0004 de AUC. Con 12 variables pierde 0,014. Es una opción si se quisiera una
   scorecard con pocas variables, pero no se eligió porque el criterio prerregistrado es la BCE.
-- **La L1 es mucho más lenta**: 12,2 minutos frente a 0,4 de toda la L2, porque `saga` es un método
+- **La L1 es mucho más lenta**: 4,9 minutos frente a 0,2 de toda la L2, porque `saga` es un método
   estocástico y necesita muchas pasadas sobre los datos para converger.
 
 ## 4. Calibración global y cambio de época
@@ -107,11 +107,11 @@ La logística **subestima la PD en 2014 y 2015**, pero no es un error del ajuste
 tasa del periodo en que se entrenó, y la tasa observada sube en los años siguientes. Parte de esa subida
 se debe a la censura por derecha de los créditos recientes (sección 3.1): de las cohortes de 2014 y 2015
 se observan sobre todo los créditos que ya se resolvieron, y entre ellos pesan más los incumplimientos
-tempranos. La red de P2 tiene el mismo problema, aunque más leve (PD media de 0,239 en validación; sección
+tempranos. La red de PD tiene el mismo problema, aunque más leve (PD media de 0,239 en validación; sección
 5.3).
 
 **Recalibración de Platt.** Un desplazamiento como este se corrige con una recalibración ajustada **solo
-en validación**. La de Platt reestima un intercepto $a$ y una pendiente $b$ sobre el logit de la PD:
+en validación**. La de Platt (2000) reestima un intercepto $a$ y una pendiente $b$ sobre el logit de la PD:
 
 $$p' = \sigma\big(a + b\,\text{logit}(p)\big).$$
 
@@ -120,17 +120,17 @@ Es una logística de una sola variable, sin penalizar, ajustada por máxima vero
 
 | Partición | PD | PD media | Tasa observada | BCE | Brier | AUC |
 |---|---|---|---|---|---|---|
-| Validación 2014 | original | 0,2151 | 0,2622 | 0,5422 | 0,1802 | 0,6830 |
+| Validación 2014 | original | 0,2151 | 0,2622 | 0,5425 | 0,1802 | 0,6830 |
 | Validación 2014 | Platt | 0,2622 | 0,2622 | 0,5351 | 0,1779 | 0,6830 |
-| Prueba 2015 | original | 0,2214 | 0,2546 | 0,5376 | 0,1781 | 0,6738 |
+| Prueba 2015 | original | 0,2214 | 0,2546 | 0,5382 | 0,1781 | 0,6738 |
 | Prueba 2015 | Platt | 0,2684 | 0,2546 | 0,5338 | 0,1771 | 0,6738 |
 
-**Tabla 5.1.4.** PD original y recalibrada con Platt (ajustado en validación 2014). La BCE usa el recorte
-de `log_loss` de scikit-learn (apartado 7). *Fuente:* elaboración propia;
+**Tabla 5.1.4.** PD original y recalibrada con Platt (ajustado en validación 2014). La BCE se calcula con
+`src/evaluation/metrics.py` (apartado 7). *Fuente:* elaboración propia;
 `python -m src.models.pd_logreg --recalibrar`, `results/tables/pd_logreg_platt.csv`.
 
 - **En prueba 2015 la calibración mejora.** El error de la PD media pasa de −0,033 a +0,014, y bajan la
-  BCE (de 0,5376 a 0,5338) y el Brier (de 0,1781 a 0,1771).
+  BCE (de 0,5382 a 0,5338) y el Brier (de 0,1781 a 0,1771).
 - **La AUC no cambia.** Con $b > 0$ la transformación es creciente y no altera el orden de los créditos.
   La discriminación del modelo sigue siendo la misma; solo cambia el nivel de la PD.
 - **En 2015 Platt se pasa.** Aprende el nivel de 2014 (26,2 %), y la tasa de 2015 es algo menor (25,5 %).
@@ -145,14 +145,14 @@ La evaluación completa de la calibración (curvas de calibración) está en la 
 
 ## 5. Frente a la red de PD
 
-La Tabla 5.1.5 compara la logística con la red de P2 en presupuesto, complejidad y métricas, con la PD
-original (sin Platt), que es la que evaluó P4.
+La Tabla 5.1.5 compara la logística con la red de PD en presupuesto, complejidad y métricas, con la PD
+original (sin Platt), que es la que se evaluó en prueba.
 
-| | Logística (P3) | MLP [64, 32] ReLU (P2) |
+| | Logística | MLP [64, 32] ReLU |
 |---|---|---|
 | Configuraciones de búsqueda | 27 | 12 |
 | Entrenamientos totales | 27 | 63 |
-| Minutos | 12,6 | 69,4 |
+| Minutos | 5,1 | 69,4 |
 | Parámetros entrenables | 83 | 7.425 |
 | AUC validación | 0,6830 | 0,6900 ± 0,0025 (30 semillas) |
 | AUC validación: peor y mejor semilla | — | 0,6818 y 0,6950 |
@@ -162,14 +162,17 @@ original (sin Platt), que es la que evaluó P4.
 | Brier prueba 2015 | 0,1781 | 0,1751 |
 
 **Tabla 5.1.5.** Logística de referencia frente a la red de PD. En prueba se evaluó una sola semilla de la
-red. *Fuente:* elaboración propia con las tablas de P4: `results/tables/p4_comparacion_justa_pd.csv`.
+red. *Fuente:* elaboración propia; `results/tables/p4_comparacion_justa_pd.csv`;
+minutos de la logística de `results/tables/pd_logreg_busqueda.csv`.
 
 - La red mejora a la logística en todas las métricas de prueba, pero por poco: **0,010 de AUC** y
   0,003 de Brier.
 - **No todas las semillas de la red superan a la logística.** La peor semilla (0,6818) queda por debajo
   de la logística (0,6830) en validación, así que la ventaja de la red depende en parte de la
   inicialización.
-- El costo de la red es 90 veces más parámetros y unas 5,5 veces más tiempo de búsqueda. La logística,
+- El costo de la red es 90 veces más parámetros y unas 14 veces más tiempo de búsqueda. Los tiempos se
+  midieron en corridas y máquinas distintas (la misma búsqueda de la logística tardó 12,6 min en una
+  corrida anterior), así que solo indican el orden de magnitud. La logística,
   además, se puede leer directamente como scorecard (sección 3.7).
 
 ## 6. Coeficientes
@@ -204,11 +207,11 @@ Los coeficientes no deben leerse uno a uno como "efecto de la variable", por tre
 - **No identificación** de las columnas redundantes (apartado 3).
 
 La interpretación por variable se hace con los puntos de la scorecard y la importancia por permutación
-(secciones 3.7 y 5.6, P4).
+(secciones 3.7 y 5.6).
 
 ## 7. Problemas de datos encontrados
 
-Estos problemas vienen del preprocesamiento (sección 3.1, P1) y afectan a todos los modelos de PD:
+Estos problemas vienen del preprocesamiento (sección 3.1) y afectan a todos los modelos de PD:
 
 - **Tres columnas constantes en entrenamiento** (apartado 3). No aportan información, inflan el conteo de
   parámetros y crean redundancia con el intercepto. Además, dos de ellas valen 1 en todo el
@@ -217,10 +220,12 @@ Estos problemas vienen del preprocesamiento (sección 3.1, P1) y afectan a todos
   créditos, el coeficiente de −0,163, que en entrenamiento era solo una parte del intercepto, sube el
   logit en 0,163 sin que el modelo haya aprendido nada sobre ellos.
 - **Valores extremos sin tratar.** En validación, `tot_coll_amt` llega a 13.329 desviaciones estándar,
-  cuando su máximo en entrenamiento es 109. Ese crédito recibe una PD de 1,0. Por ese único valor, **la
-  BCE de validación depende de cómo se recorten las probabilidades**: 0,54219 con el recorte de
-  `log_loss` de scikit-learn (la de esta sección) y 0,54246 con el de `src/evaluation/metrics.py`
-  (sección 5.3). La AUC no cambia, porque solo depende del orden.
+  cuando su máximo en entrenamiento es 109, y ese crédito recibe una PD de 1,0. En prueba, un crédito que
+  incumplió recibe una PD de $9\times10^{-25}$. Sus términos dominan cualquier recorte, así que **la BCE
+  depende del épsilon con que se recorte la probabilidad**: con `src/evaluation/metrics.py` (épsilon de
+  float64), la de esta sección, da 0,54246 en validación y 0,53823 en prueba; con `log_loss` de
+  scikit-learn sobre float32, como se calculaba antes, daba 0,54219 y 0,53758. El orden de los modelos y la
+  elección no cambian, y la AUC tampoco, porque solo depende del orden.
 
 ## 8. Limitaciones
 
@@ -233,3 +238,15 @@ Estos problemas vienen del preprocesamiento (sección 3.1, P1) y afectan a todos
   la tasa real, pero se pasa, porque la tasa vuelve a cambiar de un año a otro. No se probó la
   recalibración isotónica.
 - **Los valores extremos** (apartado 7) no se trataron.
+
+---
+
+## Referencias
+
+- Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., Blondel, M.,
+  Prettenhofer, P., Weiss, R., Dubourg, V., Vanderplas, J., Passos, A., Cournapeau, D., Brucher, M.,
+  Perrot, M., & Duchesnay, É. (2011). Scikit-learn: Machine learning in Python. *Journal of Machine
+  Learning Research, 12*(85), 2825–2830. https://jmlr.org/papers/v12/pedregosa11a.html
+- Platt, J. C. (2000). Probabilistic outputs for support vector machines and comparisons to regularized
+  likelihood methods. En A. J. Smola, P. L. Bartlett, B. Schölkopf y D. Schuurmans (Eds.), *Advances in
+  large margin classifiers* (pp. 61–74). MIT Press.

@@ -6,9 +6,9 @@ import numpy as np
 import pandas as pd
 from scipy.special import expit, logit
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import brier_score_loss, log_loss, roc_auc_score
 
 from src.data import load_splits
+from src.evaluation.metrics import metricas_pd
 from src.utils.cli import build_parser, init_run
 from src.utils.config import ROOT
 from src.utils.registry import LOG_PATH, log_run
@@ -28,13 +28,6 @@ def predecir_pd_logistica(modelo, X):
     return modelo.predict_proba(X)[:, 1]
 
 
-def _metricas(y, p):
-    # provisional mientras no exista metrics.py de P4; la bce es el criterio de selección, igual que en P2
-    auc = roc_auc_score(y, p)
-    return {"bce": log_loss(y, p, labels=[0, 1]), "auc": auc, "gini": 2 * auc - 1,
-            "brier": brier_score_loss(y, p)}
-
-
 def buscar_regularizacion(X_train, y_train, X_val, y_val, rejilla_C, l1_ratios, sin_penalizacion=True,
                           seed=90, max_iter=1000, ruta_tabla=None, ruta_log=LOG_PATH):
     """Entrena cada (C, l1_ratio), registra el presupuesto y devuelve el de menor bce en validación."""
@@ -45,7 +38,9 @@ def buscar_regularizacion(X_train, y_train, X_val, y_val, rejilla_C, l1_ratios, 
         inicio = time.perf_counter()
         modelo = entrenar_logistica(X_train, y_train, C, l1, seed, max_iter)
         segundos = time.perf_counter() - inicio
-        metricas = _metricas(y_val, predecir_pd_logistica(modelo, X_val))
+        # métricas de src/evaluation/metrics.py (en float64, como el resto del trabajo); la bce es el criterio
+        # de selección, el mismo de la red de PD
+        metricas = metricas_pd(y_val, predecir_pd_logistica(modelo, X_val))
         # n_params cuenta todos los coeficientes + intercepto; con l1 también importa cuántos quedaron vivos
         metricas["n_no_cero"] = int(np.count_nonzero(modelo.coef_))
         metricas["convergio"] = bool(modelo.n_iter_.max() < max_iter)
@@ -82,7 +77,7 @@ def recalibrar(modelo, datos, ruta_tabla=None):
         y, p = datos[f"y_{particion}"], predecir_pd_logistica(modelo, datos[f"X_{particion}"])
         for version, q in [("original", p), ("platt", aplicar_platt(p, a, b))]:
             filas.append({"particion": particion, "version": version, "pd_media": float(np.mean(q)),
-                          "tasa_real": float(np.mean(y)), **_metricas(y, q), "a": a, "b": b})
+                          "tasa_real": float(np.mean(y)), **metricas_pd(y, q), "a": a, "b": b})
     tabla = pd.DataFrame(filas)
     if ruta_tabla is not None: tabla.to_csv(ruta_tabla, index=False)
     return tabla, a, b

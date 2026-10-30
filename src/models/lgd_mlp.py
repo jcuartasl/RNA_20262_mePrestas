@@ -12,6 +12,7 @@ from scipy import stats
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.data import load_splits
+from src.evaluation.metrics import metricas_lgd  # train_lgd y lgd_random_search la importan desde aquí
 from src.models.lgd_linear import predict_lgd_linear, train_lgd_linear
 from src.models.losses import beta_con_logits, get_loss, penalizacion_l1, penalizacion_l2
 from src.models.mlp import build_mlp
@@ -19,11 +20,11 @@ from src.utils.config import ROOT
 
 
 def _opciones(cfg):
-    """Traduce la config anidada de P5 (model.hidden, train.lr, loss.name...) a valores planos."""
+    """Traduce la config anidada del proyecto (model.hidden, train.lr, loss.name...) a valores planos."""
     modelo, entrenamiento, perdida = cfg.get("model", {}), cfg.get("train", {}), cfg.get("loss", {})
-    # el atajo de la guía (--override loss=beta) deja loss como texto en vez de diccionario
+    # si la config trae loss como texto (loss: beta) en vez de diccionario; por cli es loss.name=beta
     if isinstance(perdida, str): perdida = {"name": perdida}
-    # los valores por defecto hacen falta porque la demo de P5 solo trae train.epochs y sample_fraction
+    # los valores por defecto hacen falta si una config no trae model ni loss (train_lgd completa con lgd_mlp.yaml)
     return {"hidden_layers": list(modelo.get("hidden", [64, 32])),
             "activation": modelo.get("activation", "relu"),
             "dropout": float(modelo.get("dropout", 0.2)), "perdida": perdida.get("name", "mse"),
@@ -101,16 +102,8 @@ def contar_parametros(modelo, log_phi=None):
     return sum(p.numel() for p in modelo.parameters() if p.requires_grad) + (log_phi is not None)
 
 
-def metricas_lgd(y, p):
-    """Rmse, mae y r2 (provisional hasta que exista metrics.py de P4)."""
-    y, p = np.asarray(y, dtype=np.float64), np.asarray(p, dtype=np.float64)
-    error = y - p
-    return {"rmse": float(np.sqrt(np.mean(error ** 2))), "mae": float(np.mean(np.abs(error))),
-            "r2": float(1 - np.sum(error ** 2) / np.sum((y - y.mean()) ** 2))}
-
-
 def guardar_lgd_mlp(modelo, log_phi, cfg, ruta):
-    """Guarda arquitectura, pesos, pérdida y log_phi, con el mismo formato base que pd_export.py de P2."""
+    """Guarda arquitectura, pesos, pérdida y log_phi, con el mismo formato base que pd_export.py."""
     op = _opciones(cfg)
     arquitectura = {"input_dim": modelo.network[0].in_features, "hidden_layers": op["hidden_layers"],
                     "activation": op["activation"], "dropout": op["dropout"], "output_activation": "none"}
@@ -186,7 +179,7 @@ def figuras_distribucion_lgd(carpeta=ROOT / "results" / "figures"):
     fig.savefig(carpeta / "lgd_qq_beta_normal.png", dpi=300)
     plt.close(fig)
 
-    # la media condicional se aproxima con la lineal de P2; se agrupa en deciles de esa predicción
+    # la media condicional se aproxima con la regresión lineal de referencia; se agrupa en deciles de esa predicción
     lineal, metricas = train_lgd_linear(datos["X_train"], datos["y_train"], datos["X_val"], datos["y_val"])
     p_val, y_val = predict_lgd_linear(lineal, datos["X_val"]), datos["y_val"].astype(np.float64)
     decil = pd.qcut(predict_lgd_linear(lineal, datos["X_train"]), 10, labels=False)

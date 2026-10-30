@@ -3,7 +3,7 @@
 **Curso:** Redes Neuronales y Algoritmos Bioinspirados  
 **Universidad:** Universidad Nacional de Colombia  
 **Proyecto:** Trabajo 2 — Redes neuronales para datos tabulares (*¿me prestas?*)  
-**Responsable:** P3 · **Revisión:** P2 · **Estado:** borrador para integración
+**Estado:** borrador para integración
 
 > La sección tiene dos partes. Los apartados 1 a 5 derivan cada función de pérdida que usa el proyecto a
 > partir de un modelo probabilístico. Los apartados 6 a 11 aplican esas derivaciones a la LGD: fijan la
@@ -13,7 +13,7 @@
 >
 > *Nota de versión:* las cifras de los apartados 6 a 11 se recalcularon cuando el equipo volvió a sortear
 > la partición aleatoria (`split_seed: 90`, sección 4). Ninguna conclusión cambió. La numeración de
-> figuras y tablas (3.3.x) es provisional hasta la integración del blog.
+> figuras y tablas (3.3.x) y las remisiones a otras secciones, que siguen la estructura de la guía del curso, son provisionales hasta la integración del blog.
 
 ---
 
@@ -81,12 +81,13 @@ LGD 0,1, el gradiente es casi nulo (`test_mse_se_satura_con_logits_extremos`).
 
 ## 4. BCE fraccional: cuasi-verosimilitud para $y \in [0, 1]$
 
-**Pérdida.** La misma expresión de la BCE, $\ell_i = \ln(1+e^{z_i}) - y_i z_i$, pero con $y_i$ continua
+**Pérdida.** Es la propuesta de Papke y Wooldridge (1996) para respuestas fraccionales: la misma
+expresión de la BCE, $\ell_i = \ln(1+e^{z_i}) - y_i z_i$, pero con $y_i$ continua
 en $[0, 1]$ (`bce_fraccional_con_logits`, que es la que devuelve `get_loss("bce")`).
 
 **No es una verosimilitud.** $\mu^{y}(1-\mu)^{1-y}$ no integra 1 sobre $[0, 1]$:
 $\int_0^1 \mu^{y}(1-\mu)^{1-y}\,dy = (2\mu - 1)/\ln\frac{\mu}{1-\mu}$, que vale 0,5 en $\mu = 0{,}5$. Por
-eso se habla de cuasi-verosimilitud: solo se especifica la media, $E[Y \mid x] = \sigma(z)$, y la forma
+eso se habla de cuasi-verosimilitud (Wedderburn, 1974): solo se especifica la media, $E[Y \mid x] = \sigma(z)$, y la forma
 de la pérdida corresponde a suponer $\text{Var}(Y \mid x) \propto \mu(1-\mu)$.
 
 **Por qué funciona.** Fijado $x$, sea $m = E[Y \mid x]$. La pérdida esperada es
@@ -99,7 +100,7 @@ exactos sin tratamiento especial.
 
 ## 5. Beta: regresión Beta con media y precisión
 
-**Modelo.** $Y \mid x \sim \text{Beta}(a, b)$ con $a = \mu\phi$, $b = (1-\mu)\phi$, $\mu = \sigma(z)$ y
+**Modelo.** Con la parametrización de Ferrari y Cribari-Neto (2004), $Y \mid x \sim \text{Beta}(a, b)$ con $a = \mu\phi$, $b = (1-\mu)\phi$, $\mu = \sigma(z)$ y
 una precisión $\phi > 0$ común que se aprende como $\phi = e^{\eta}$. Así $E[Y] = \mu$ y
 $\text{Var}(Y) = \mu(1-\mu)/(1+\phi)$. La densidad es
 
@@ -191,7 +192,7 @@ que supone cada función de pérdida (cada supuesto se escala a la varianza prom
 que solo se compara la forma). *Fuente:* elaboración propia, misma partición y código que la
 Figura 3.3.1.
 
-**Las variables explican una parte pequeña de la LGD.** La regresión lineal de referencia (P2) obtiene
+**Las variables explican una parte pequeña de la LGD.** La regresión lineal de referencia obtiene
 $R^2 = 0{,}19$ en validación, y sus predicciones tienen una desviación estándar de 0,088 frente a 0,202
 de la LGD observada en ese mismo conjunto.
 
@@ -224,9 +225,10 @@ de modo que la única diferencia entre ellas es el modelo probabilístico del er
   - Con $\phi$ constante supone la misma forma de varianza que la BCE fraccional, que se queda corta
     frente a la caída observada (Figura 3.3.3).
   - **No iguala la media muestral.** Como se vio en el apartado 5, la máxima verosimilitud iguala los
-    log-momentos. Solo si los datos siguen una Beta eso equivale a estimar bien la media. Con datos
-    simulados de una Beta, la media ajustada coincide con la muestral (diferencia +0,0002); con la LGD
-    observada, sin variables, queda 0,0096 por debajo (0,6943 frente a 0,7039), y 0,0099 por debajo si se
+    log-momentos. Solo si los datos siguen una Beta eso equivale a estimar bien la media. Con 41.173
+    valores simulados de la Beta ajustada (semilla 0), la media ajustada coincide con la muestral
+    (diferencia +0,0003); con la LGD observada, sin variables, queda 0,0095 por debajo (0,694 frente a
+    0,704), y 0,0099 por debajo si se
     excluyen los 0 y 1 exactos, así que la diferencia se debe a la forma de la distribución y no al
     recorte.
 
@@ -272,7 +274,7 @@ Se contrastan con los resultados en la sección 6.
   red; queda como posible ajuste si la distribución predicha no reproduce la observada.
 - **Sensibilidad a $\varepsilon$** en la Beta: se evalúa con
   $\varepsilon \in \lbrace 10^{-2}, 10^{-3}, 10^{-4}, 1{,}2\times10^{-5}\rbrace$ (el último equivale a la
-  transformación de Smithson y Verkuilen con el $n$ de entrenamiento).
+  transformación de Smithson y Verkuilen (2006) con el $n$ de entrenamiento).
 - **Análisis marginal.** La Tabla 3.3.1 y las Figuras 3.3.1 y 3.3.2 describen la distribución de la LGD
   sin condicionar a las variables; la red ajusta una distribución por crédito, así que la evidencia
   decisiva es la comparación de la sección 6.
@@ -280,12 +282,15 @@ Se contrastan con los resultados en la sección 6.
 
 ---
 
-## Referencias por verificar
+## Referencias
 
-Antes de citarlas en la versión final deben confirmarse autores, año, título y DOI en la fuente
-primaria:
-
-- Ferrari y Cribari-Neto (2004), sobre regresión Beta con parametrización media–precisión.
-- Papke y Wooldridge (1996), sobre modelos para respuestas fraccionales.
-- Smithson y Verkuilen (2006), sobre la transformación de valores 0 y 1 en regresión Beta.
-- Wedderburn (1974), sobre cuasi-verosimilitud.
+- Ferrari, S. L. P., & Cribari-Neto, F. (2004). Beta regression for modelling rates and proportions.
+  *Journal of Applied Statistics, 31*(7), 799–815. https://doi.org/10.1080/0266476042000214501
+- Papke, L. E., & Wooldridge, J. M. (1996). Econometric methods for fractional response variables with an
+  application to 401(k) plan participation rates. *Journal of Applied Econometrics, 11*(6), 619–632.
+  https://doi.org/10.1002/(SICI)1099-1255(199611)11:6%3C619::AID-JAE418%3E3.0.CO;2-1
+- Smithson, M., & Verkuilen, J. (2006). A better lemon squeezer? Maximum-likelihood regression with
+  beta-distributed dependent variables. *Psychological Methods, 11*(1), 54–71.
+  https://doi.org/10.1037/1082-989X.11.1.54
+- Wedderburn, R. W. M. (1974). Quasi-likelihood functions, generalized linear models, and the
+  Gauss–Newton method. *Biometrika, 61*(3), 439–447. https://doi.org/10.1093/biomet/61.3.439

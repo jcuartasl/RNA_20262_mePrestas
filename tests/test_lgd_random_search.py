@@ -5,8 +5,8 @@ import pytest
 import torch
 
 from src.models.lgd_mlp import entrenar_lgd_mlp, predecir_lgd
-from src.search.lgd_random_search import (PERDIDAS, buscar_lgd, calibracion_por_decil, config_de_fila,
-                                          configurar, escribir_config_final, mejor_por_perdida,
+from src.search.lgd_random_search import (PERDIDAS, buscar_lgd, calibracion_por_decil, comparar_con_observada,
+                                          config_de_fila, configurar, escribir_config_final, mejor_por_perdida,
                                           muestrear_configuraciones, resumir_semillas, semillas_de_config,
                                           techo_tanh)
 from src.utils.config import load_config
@@ -107,3 +107,16 @@ def test_semillas_de_config_usa_el_nombre_de_experimento_dado(tmp_path):
     cfg = configurar(BASE, {"hidden": [8], "activation": "relu", "dropout": 0.0, "lr": 1e-2, "l2": 0.0}, "bce")
     semillas_de_config(datos(), cfg, [0], ruta_log=tmp_path / "log.csv", experimento="lgd_mlp_relu")
     assert list(pd.read_csv(tmp_path / "log.csv")["experiment"]) == ["lgd_mlp_relu"]
+
+
+def test_comparar_con_observada_promedia_las_semillas():
+    rng = np.random.default_rng(0)
+    y = rng.uniform(0, 1, 500)
+    semillas = pd.DataFrame({"seed0": 0.5 + 0.1 * (y - 0.5), "seed1": 0.5 + 0.2 * (y - 0.5)})
+    resumen, cuantiles = comparar_con_observada(y, {"red": semillas, "lineal": semillas[["seed0"]]})
+    red, lineal = resumen.set_index("modelo").loc["red"], resumen.set_index("modelo").loc["lineal"]
+    # sd predicha / sd observada vale 0.1 y 0.2 por construcción: la media entre semillas es 0.15
+    assert red["n_semillas"] == 2 and red["cociente_sd_media"] == pytest.approx(0.15)
+    assert lineal["n_semillas"] == 1 and np.isnan(lineal["cociente_sd_sd"])
+    np.testing.assert_allclose(cuantiles["observada"], np.quantile(y, cuantiles.index))
+    np.testing.assert_allclose(cuantiles["lineal"], np.quantile(semillas["seed0"], cuantiles.index))

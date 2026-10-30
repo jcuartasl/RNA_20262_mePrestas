@@ -1,6 +1,7 @@
 """Pruebas de src/models/lgd_mlp.py y del contrato de src/experiments/train_lgd.py con datos sintéticos."""
 import numpy as np
 import pytest
+import torch
 
 import src.experiments.train_lgd as train_lgd
 from src.models.lgd_mlp import (_opciones, ajustar_beta_marginal, cargar_lgd_mlp, contar_parametros,
@@ -115,6 +116,10 @@ def test_contrato_con_la_config_de_la_demo(contrato):
     # la demo no debe pisar el modelo entrenado con todos los datos
     assert (contrato / "models" / "lgd_mlp_demo_seed90.pt").exists()
     assert not (contrato / "models" / "lgd_mlp_seed90.pt").exists()
+    # y debe entrenar la red final de configs/lgd_mlp.yaml, no la de los valores por defecto (mse, relu)
+    guardado = torch.load(contrato / "models" / "lgd_mlp_demo_seed90.pt", weights_only=True)
+    assert guardado["perdida"] == "bce" and guardado["architecture"]["activation"] == "tanh"
+    assert guardado["architecture"]["hidden_layers"] == [128, 64, 32]
 
 
 def test_un_override_si_cambia_el_entrenamiento(contrato):

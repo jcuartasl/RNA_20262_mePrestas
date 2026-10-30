@@ -61,6 +61,29 @@ $env:ME_PRESTAS_VIDEO_URL="por definir"
 python -m src.experiments.train_pd --config configs/pd_mlp.yaml --override train.lr=0.001 model.hidden=[64,32] model.dropout=0.2
 ```
 
+### Logística de PD y red de LGD (en este orden)
+| Qué | Comando | Escribe |
+|---|---|---|
+| Logística de PD: búsqueda L1/L2 (27 configuraciones) | `python -m src.models.pd_logreg` | `results/tables/pd_logreg_busqueda.csv`, `models/pd_logreg.joblib` |
+| Recalibración de Platt (usa el modelo guardado, no reentrena) | `python -m src.models.pd_logreg --recalibrar` | `results/tables/pd_logreg_platt.csv` |
+| Figuras de la distribución de la LGD (sección 3.3) | `python -m src.models.lgd_mlp` | `results/figures/lgd_ajuste_beta_normal.png`, `lgd_qq_beta_normal.png`, `lgd_varianza_por_decil.png` |
+| LGD 1: búsqueda pareada (12 configuraciones × 3 pérdidas) | `python -m src.search.lgd_random_search --fase buscar` | `results/tables/lgd_busqueda.csv`, `configs/lgd_mlp.yaml` |
+| LGD 2: 30 semillas de la configuración final | `python -m src.experiments.run_seeds --model lgd_mlp --n_seeds 30` | `models/lgd_mlp_seed{0..29}.pt` |
+| LGD 3: 30 semillas de las otras pérdidas y sensibilidad a ε | `python -m src.search.lgd_random_search --fase semillas` | `results/tables/lgd_semillas_{mse,beta}.csv`, `lgd_sensibilidad_eps.csv` |
+| LGD 4: resumen de semillas, distribución predicha y curva | `python -m src.search.lgd_random_search --fase resumir` | `results/tables/lgd_semillas_resumen.csv`, `results/figures/lgd_pred_vs_obs.png`, `lgd_curva_aprendizaje.png` |
+| LGD 5: techo de la tanh, calibración por deciles y ReLU | `python -m src.search.lgd_random_search --fase diagnostico` | `results/tables/lgd_diagnostico_techo.csv`, `lgd_calibracion_deciles.csv`, `lgd_techo_relu.csv` |
+| LGD 6: estabilidad con la partición temporal | `python -m src.search.lgd_random_search --fase temporal` | `results/tables/lgd_estabilidad_temporal.csv` |
+| LGD 7: distribución predicha frente a la observada | `python -m src.search.lgd_random_search --fase distribucion` | `results/tables/lgd_distribucion_val.csv`, `lgd_cuantiles_val.csv` |
+| Red de LGD con una semilla (la de la configuración) | `python -m src.experiments.train_lgd` | `models/lgd_mlp_seed90.pt` |
+
+- La fase `resumir` lee los modelos del paso 2 y toma sus tiempos de `results/tables/experiment_log.csv`.
+- Cambiar la pérdida, la regularización o la tasa de aprendizaje de la red de LGD sin editar código:
+  ```bash
+  python -m src.experiments.train_lgd --override loss.name=beta train.l2=1e-4 train.lr=0.001 model.hidden=[64,32]
+  ```
+  Las claves se escriben completas (`train.lr`, no `lr`): una clave incompleta se ignora sin aviso, y
+  `loss=beta` da error porque `loss` es una sección.
+
 ## Aplicación web: qué datos pide y por qué
 - El formulario se construye desde los modelos guardados (`GET /esquema`, módulo `app/servicio.py`): 21 variables que el
   preprocesador exige y que un solicitante puede declarar o consultar en buró **antes del desembolso** (caso de uso de pre-aprobación).

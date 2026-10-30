@@ -1,13 +1,16 @@
-"""Entrena la red de LGD (regresión). Responsable: P3."""
+"""Entrena la red de LGD (regresión)."""
 import time
+from pathlib import Path
 
 import numpy as np
 
 from src.data import load_splits
 from src.models.lgd_mlp import contar_parametros, entrenar_lgd_mlp, guardar_lgd_mlp, metricas_lgd, predecir_lgd
 from src.utils.cli import build_parser, init_run
-from src.utils.config import ROOT
+from src.utils.config import ROOT, _merge, load_config
 from src.utils.registry import log_run
+
+CONFIG_FINAL = Path(__file__).resolve().parents[2] / "configs" / "lgd_mlp.yaml"
 
 
 def train(cfg: dict, seed: int) -> dict:
@@ -17,6 +20,8 @@ def train(cfg: dict, seed: int) -> dict:
     - Guarda el modelo con la semilla en el nombre: models/lgd_mlp_seed{seed}.pt
     - Claves de metrics acordadas: rmse, mae, r2.
     """
+    # la demo solo trae epochs y sample_fraction: lo demás sale de la config final, no de los valores por defecto
+    cfg = _merge(load_config(str(CONFIG_FINAL)), cfg)
     datos = load_splits("lgd", cfg.get("data", {}).get("scheme", "random"))
     X, y = datos["X_train"], datos["y_train"]
     # la demo entrena con una muestra de train para tardar menos de 2 minutos; validación queda completa

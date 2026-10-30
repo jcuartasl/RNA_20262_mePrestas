@@ -14,6 +14,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from src.data import load_splits
+from src.evaluation.distributions import comparar_distribuciones
 from src.models.lgd_linear import predict_lgd_linear, train_lgd_linear
 from src.models.lgd_mlp import (cargar_lgd_mlp, contar_parametros, entrenar_lgd_mlp, metricas_lgd,
                                 predecir_lgd)
@@ -35,7 +36,7 @@ def muestrear_configuraciones(n, seed):
 
 
 def configurar(base, combinacion, perdida):
-    """Copia la config anidada de P5 y le pone los hiperparámetros de la combinación y la pérdida."""
+    """Copia la config anidada y le pone los hiperparámetros de la combinación y la pérdida."""
     cfg = copy.deepcopy(base)
     cfg.setdefault("model", {}).update(hidden=combinacion["hidden"], activation=combinacion["activation"],
                                        dropout=combinacion["dropout"])
@@ -74,7 +75,7 @@ def buscar_lgd(datos, base, n_configs=12, seed=90, ruta_tabla=None, ruta_log=LOG
 def mejor_por_perdida(tabla, tolerancia=2.5e-4):
     """La fila de menor rmse de cada pérdida; las empatadas con la mejor van primero, la menos encogida antes."""
     mejores = tabla.loc[tabla.groupby("perdida")["rmse"].idxmin()]
-    # desempate prerregistrado (sección 3.3): una diferencia menor que la sd entre semillas (~2.5e-4) es empate;
+    # desempate de la sección 3.3 (la tolerancia, ~sd entre semillas, se fijó tras la primera corrida);
     # todas las redes encogen las predicciones, así que la de mayor sd_pred es la más cercana a la observada
     empatadas = mejores[mejores["rmse"] <= mejores["rmse"].min() + tolerancia].sort_values("sd_pred", ascending=False)
     resto = mejores.drop(empatadas.index).sort_values("rmse")
@@ -93,7 +94,8 @@ def escribir_config_final(base, fila, ruta):
     cfg = config_de_fila(base, fila)
     final = {clave: cfg[clave] for clave in ("data", "train", "model", "loss") if clave in cfg}
     encabezado = ("# configuración final elegida por src/search/lgd_random_search.py\n"
-                  f"# menor rmse en validación aleatoria: {fila['rmse']:.5f} (r2 = {fila['r2']:.4f})\n"
+                  f"# elegida en validación aleatoria con el desempate de la sección 3.3: rmse {fila['rmse']:.5f}, "
+                  f"r2 {fila['r2']:.4f}\n"
                   "# tabla completa en results/tables/lgd_busqueda.csv\n")
     with open(ruta, "w", encoding="utf-8") as archivo:
         archivo.write(encabezado + yaml.safe_dump(final, sort_keys=False, default_flow_style=None))
@@ -133,7 +135,7 @@ def resumir_semillas(tabla):
 def fase_semillas(base, datos, n_seeds):
     """30 semillas de la mejor config de las pérdidas no ganadoras y sensibilidad a eps de la beta."""
     mejores = mejor_por_perdida(pd.read_csv(TABLAS / "lgd_busqueda.csv"))
-    # la ganadora se corre con run_seeds de P5, que guarda los modelos oficiales lgd_mlp_seed{s}.pt
+    # la ganadora se corre con src/experiments/run_seeds.py, que guarda los modelos oficiales lgd_mlp_seed{s}.pt
     for _, fila in mejores.iloc[1:].iterrows():
         tabla, predicciones = semillas_de_config(datos, config_de_fila(base, fila), base["run_seeds"][:n_seeds])
         tabla.to_csv(TABLAS / f"lgd_semillas_{fila['perdida']}.csv", index=False)
@@ -193,7 +195,7 @@ def fase_resumir(base, datos, n_seeds):
     fig.savefig(FIGURAS / "lgd_pred_vs_obs.png", dpi=300)
     plt.close(fig)
 
-    # curva de entrenamiento y validación de la ganadora (la de P2 trae el título de pd fijo); la config
+    # curva de entrenamiento y validación de la ganadora (la de pd trae el título de pd fijo); la config
     # sale de la tabla de búsqueda y no de base, para que un --override no cambie la curva sin notarlo
     cfg_ganadora = config_de_fila(base, mejores.iloc[0])
     _, _, historial = entrenar_lgd_mlp(datos["X_train"], datos["y_train"], datos["X_val"], datos["y_val"],
@@ -269,6 +271,28 @@ def fase_diagnostico(base, datos, n_seeds=5):
     return pd.DataFrame(filas), deciles, comparacion
 
 
+def comparar_con_observada(y, predicciones, cuantiles=(0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99)):
+    """Tablas 6.3.5 y 6.3.6: métricas de distribución de distributions.py y cuantiles, promediados entre semillas."""
+    resumen, tabla_q = [], {"observada": np.quantile(np.asarray(y, dtype=np.float64), cuantiles)}
+    for nombre, df in predicciones.items():
+        por_semilla = pd.DataFrame([comparar_distribuciones(y, df[c]) for c in df.columns])
+        resumen.append({"modelo": nombre, "n_semillas": df.shape[1], **por_semilla.mean().add_suffix("_media"),
+                        **por_semilla.std().add_suffix("_sd")})
+        tabla_q[nombre] = np.mean([np.quantile(df[c], cuantiles) for c in df.columns], axis=0)
+    return pd.DataFrame(resumen), pd.DataFrame(tabla_q, index=pd.Index(cuantiles, name="cuantil"))
+
+
+def fase_distribucion(datos):
+    """Compara la distribución predicha (30 semillas por pérdida y la lineal) con la observada en validación."""
+    lineal, _ = train_lgd_linear(datos["X_train"], datos["y_train"], datos["X_val"], datos["y_val"])
+    predicciones = {f"mlp {p}": pd.read_csv(TABLAS / f"lgd_pred_val_{p}.csv.gz") for p in PERDIDAS}
+    predicciones["lineal"] = pd.DataFrame({"seed0": predict_lgd_linear(lineal, datos["X_val"])})
+    resumen, cuantiles = comparar_con_observada(datos["y_val"], predicciones)
+    resumen.to_csv(TABLAS / "lgd_distribucion_val.csv", index=False)
+    cuantiles.to_csv(TABLAS / "lgd_cuantiles_val.csv")
+    return resumen, cuantiles
+
+
 def fase_temporal(base, n_seeds=5):
     """Entrena la config final con la partición temporal (train <= 2013) y la evalúa en validación 2014."""
     # la prueba (2015) no se toca: solo se usan train y validación de la partición temporal
@@ -291,7 +315,7 @@ def fase_temporal(base, n_seeds=5):
 
 def main():
     parser = build_parser("Búsqueda pareada del MLP de LGD", "configs/lgd_mlp.yaml")
-    parser.add_argument("--fase", choices=["buscar", "semillas", "resumir", "diagnostico", "temporal"],
+    parser.add_argument("--fase", choices=["buscar", "semillas", "resumir", "diagnostico", "temporal", "distribucion"],
                         default="buscar")
     parser.add_argument("--n_configs", type=int, default=12)
     parser.add_argument("--n_seeds", type=int, default=30)
@@ -304,6 +328,9 @@ def main():
     datos = load_splits("lgd", base.get("data", {}).get("scheme", "random"))
     if args.fase == "diagnostico":
         for tabla in fase_diagnostico(base, datos): print(tabla.round(4).to_string(), "\n")
+        return
+    if args.fase == "distribucion":
+        for tabla in fase_distribucion(datos): print(tabla.round(4).to_string(), "\n")
         return
     if args.fase == "semillas": return fase_semillas(base, datos, args.n_seeds)
     if args.fase == "resumir":

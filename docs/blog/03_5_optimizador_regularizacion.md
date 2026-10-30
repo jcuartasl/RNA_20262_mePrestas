@@ -3,13 +3,13 @@
 **Curso:** Redes Neuronales y Algoritmos Bioinspirados  
 **Universidad:** Universidad Nacional de Colombia  
 **Proyecto:** Trabajo 2 — Redes neuronales para datos tabulares (*¿me prestas?*)  
-**Responsable:** P3 · **Revisión:** P2 · **Estado:** borrador para integración
+**Estado:** borrador para integración
 
 > La sección 3.3 dice **qué** se minimiza (la pérdida, derivada por máxima verosimilitud). Esta dice
 > **cómo** se minimiza (SGD y Adam) y **cómo se evita el sobreajuste** (L1, L2, dropout y parada
 > temprana). Cada propiedad que se afirma está respaldada por una prueba de `tests/test_optim.py`, que
 > usa un Adam escrito a mano (`src/models/optim.py`) y lo compara con el de PyTorch. La numeración de
-> tablas (3.5.x) es provisional hasta la integración del blog.
+> tablas (3.5.x) y las remisiones a otras secciones, que siguen la estructura de la guía del curso, son provisionales hasta la integración del blog.
 
 ---
 
@@ -35,7 +35,7 @@ SGD tiene tres problemas que motivan Adam:
 
 ## 2. Adam
 
-Adam combina dos promedios móviles exponenciales del gradiente, elemento a elemento:
+Adam (Kingma y Ba, 2015) combina dos promedios móviles exponenciales del gradiente, elemento a elemento:
 
 $$m_t = \beta_1 m_{t-1} + (1-\beta_1)\, g_t, \qquad v_t = \beta_2 v_{t-1} + (1-\beta_2)\, g_t^2.$$
 
@@ -129,8 +129,14 @@ Por eso **produce esparsidad**: el óptimo tiende a caer en puntos donde algunos
 exactamente 0, y la L1 selecciona variables. En la logística de PD (sección 5.1), la L1 con $C = 0{,}01$
 conserva 34 de las 82 variables y pierde solo 0,0004 de AUC.
 
-Los ceros exactos salen de métodos especializados, como los pasos proximales de `saga` en scikit-learn. Si
-la L1 se suma a la pérdida y se entrena con SGD o Adam, los pesos irrelevantes oscilan alrededor de 0 y
+Los ceros exactos salen de métodos especializados, como los pasos proximales de `saga` en scikit-learn.
+`saga` da un paso de gradiente sobre la pérdida, $u = w - \eta\, g$, y luego aplica el operador proximal
+de la L1, el umbral suave:
+
+$$w_j \leftarrow \operatorname{signo}(u_j)\,\max\big(\lvert u_j\rvert - \eta\lambda,\ 0\big).$$
+
+Todo coeficiente con $\lvert u_j\rvert \le \eta\lambda$ queda exactamente en 0. Si la L1 se suma a la
+pérdida y se entrena con SGD o Adam, no existe ese paso: los pesos irrelevantes oscilan alrededor de 0 y
 casi nunca valen exactamente 0.
 
 **Los sesgos no se penalizan.** El sesgo de salida fija el nivel base (la LGD media es cerca de 0,70).
@@ -147,14 +153,14 @@ $v_t$. Eso es exactamente minimizar $L + \tfrac{\lambda}{2}\lVert\mathbf{w}\rVer
 término $\lambda\mathbf{w}$ pasa por la división entre $\sqrt{\hat v_t}$, los pesos con gradientes grandes
 reciben menos regularización efectiva.
 
-**AdamW** desacopla el decaimiento: aplica
+**AdamW** (Loshchilov y Hutter, 2019) desacopla el decaimiento: aplica
 $\mathbf{w} \leftarrow \mathbf{w} - \eta\lambda\mathbf{w} - \eta\,\hat m_t / (\sqrt{\hat v_t} + \varepsilon)$,
 con el término $\lambda\mathbf{w}$ fuera de los momentos. **No equivale a una L2 en la pérdida.**
 
 La prueba `test_weight_decay_de_adam_es_l2_y_adamw_no` lo comprueba en un MLP 5→8→1 con $\lambda = 0{,}1$
 durante 30 pasos:
 - `Adam(weight_decay)` y Adam sobre `bce + 0,1 · penalizacion_l2` dan los mismos parámetros en cada paso
-  (diferencia máxima de $5{,}6\times10^{-17}$, error de redondeo);
+  (diferencia máxima menor que $10^{-16}$, error de redondeo);
 - AdamW se separa (diferencia de 0,58).
 
 Esta distinción importa para este trabajo, porque la red de PD usa `weight_decay` y la de LGD usa la
@@ -162,7 +168,7 @@ penalización explícita (apartado 8). Las dos son L2.
 
 ## 6. Dropout
 
-En entrenamiento, cada neurona oculta se apaga con probabilidad $p$ y las que quedan se reescalan:
+Con dropout (Srivastava et al., 2014), en entrenamiento cada neurona oculta se apaga con probabilidad $p$ y las que quedan se reescalan:
 
 $$\tilde h_j = \frac{r_j\, h_j}{1-p}, \qquad r_j \sim \text{Bernoulli}(1-p).$$
 
@@ -180,6 +186,12 @@ Después de cada época se mide la pérdida en validación. Si mejora, se guarda
 durante `patience` épocas seguidas, el entrenamiento se detiene y **se restauran los pesos de la mejor
 época**, no los de la última. Regulariza porque limita cuánto crecen y se especializan los pesos.
 
+Formalmente, sea $\theta_e$ el vector de pesos al terminar la época $e$ y $L_{\text{val}}(e)$ su pérdida
+de validación. Tras cada época se actualiza $e^* = \arg\min_{e' \le e} L_{\text{val}}(e')$ (solo cuenta una
+mejora estricta). El entrenamiento se detiene en la primera época $E$ con $E - e^* \ge \text{patience}$, o
+al llegar al máximo de épocas, y se devuelven $\hat\theta = \theta_{e^*}$ (`entrenar_lgd_mlp` en
+`src/models/lgd_mlp.py`).
+
 En la búsqueda de LGD (sección 6.3), 31 de las 36 configuraciones pararon antes del máximo de 100 épocas.
 En promedio entrenaron 46,1 épocas y la mejor fue la 37,1.
 
@@ -190,7 +202,7 @@ métrica queda algo optimista. Por eso la prueba se reserva para la evaluación 
 
 La Tabla 3.5.2 resume el optimizador y la regularización de la configuración final de cada modelo.
 
-| | Logística de PD (P3) | MLP de PD (P2) | MLP de LGD (P3) |
+| | Logística de PD | MLP de PD | MLP de LGD |
 |---|---|---|---|
 | Optimizador | `lbfgs` (L2) o `saga` (L1), scikit-learn | Adam, lr 0,003 | Adam, lr 0,003 |
 | Lote | todos los datos | 512 | 256 |
@@ -238,7 +250,7 @@ La Tabla 3.5.3 agrupa los 36 entrenamientos de la búsqueda de LGD según su L2 
   cada nivel incluye las tres pérdidas. Medir el efecto de cada uno exigiría variarlo con los demás fijos.
 
 La logística de PD apunta a lo mismo: con 163.541 créditos y 83 parámetros, toda la rejilla de L2 con
-$C \geq 0{,}003$ da la misma BCE hasta la cuarta cifra decimal (sección 5.1).
+$C \geq 0{,}003$ da la BCE de validación entre 0,54246 y 0,54263 (sección 5.1).
 
 ## 10. Limitaciones
 
@@ -250,11 +262,13 @@ $C \geq 0{,}003$ da la misma BCE hasta la cuarta cifra decimal (sección 5.1).
 
 ---
 
-## Referencias por verificar
+## Referencias
 
-Antes de citarlas en la versión final deben confirmarse autores, año, título y DOI en la fuente
-primaria:
-
-- Kingma y Ba (2015), artículo original de Adam.
-- Loshchilov y Hutter (2019), sobre el decaimiento de pesos desacoplado (AdamW).
-- Srivastava et al. (2014), sobre dropout.
+- Kingma, D. P., & Ba, J. (2015). *Adam: A method for stochastic optimization* [Conference paper]. 3rd
+  International Conference on Learning Representations, San Diego, CA, United States.
+  https://doi.org/10.48550/arXiv.1412.6980
+- Loshchilov, I., & Hutter, F. (2019). *Decoupled weight decay regularization* [Conference paper].
+  International Conference on Learning Representations (ICLR 2019). https://doi.org/10.48550/arXiv.1711.05101
+- Srivastava, N., Hinton, G., Krizhevsky, A., Sutskever, I., & Salakhutdinov, R. (2014). Dropout: A simple
+  way to prevent neural networks from overfitting. *Journal of Machine Learning Research, 15*(56),
+  1929–1958. https://jmlr.org/papers/v15/srivastava14a.html

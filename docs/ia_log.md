@@ -1,6 +1,6 @@
 # Registro de uso de IA y cacería de alucinaciones
 
-## P3 — Juan David Robayo (pérdidas, optimización y regularización)
+## Juan David Robayo (pérdidas, optimización y regularización)
 
 Cada hallazgo sigue los seis puntos del enunciado. Las cifras se recalcularon con la partición aleatoria
 vigente (`split_seed: 90`). Cuando la respuesta de la IA cita números, son los de la partición que había
@@ -8,7 +8,7 @@ en ese momento.
 
 ---
 
-### P3-1. "La L2 dentro de Adam no equivale a sumar λ‖w‖² a la pérdida"
+### JR-1. "Eso no equivale a sumar λ‖w‖²; esa es la diferencia entre Adam y AdamW" (razón equivocada)
 
 - **Categoría:** matemáticas / conceptos (optimizador y regularización)
 - **IA:** Claude (Claude Code, Opus 5.5) · **fecha:** 2026-10-24
@@ -19,19 +19,23 @@ en ese momento.
   > 7. **L2 implementada como `weight_decay` dentro de Adam.** Con Adam eso no equivale exactamente a
   > sumar λ‖w‖² a la pérdida; esa es la diferencia entre Adam y AdamW. Es un buen punto para tu
   > sección 3.5 y posible material para la cacería de alucinaciones.
-- **3. Sospecha:** el gradiente de $\tfrac{\lambda}{2}\lVert w\rVert^2$ es $\lambda w$. Si `weight_decay`
-  suma $\lambda w$ al gradiente antes de los momentos, las dos cosas deberían ser idénticas.
+- **3. Sospecha:** tomada al pie de la letra, la frase es cierta solo por un factor: el gradiente de
+  $\tfrac{\lambda}{2}\lVert w\rVert^2$ es $\lambda w$, así que `weight_decay=λ` equivale a sumar
+  $\tfrac{\lambda}{2}\lVert w\rVert^2$ y no $\lambda\lVert w\rVert^2$. Lo dudoso es la razón: atribuirlo a la
+  diferencia entre Adam y AdamW sugiere que el `weight_decay` de Adam no es una L2. Si suma $\lambda w$
+  al gradiente antes de los momentos, debería ser exactamente una L2.
 - **4. Evidencia:**
   - En el código fuente de PyTorch 2.14.1 (`torch/optim/adam.py`), con `weight_decay` y sin
     `decoupled_weight_decay`, Adam hace `grad = grad.add(param, alpha=weight_decay)` antes de actualizar
     los momentos.
   - Experimento `tests/test_optim.py::test_weight_decay_de_adam_es_l2_y_adamw_no`: MLP 5→8→1 en float64,
     $\lambda = 0{,}1$, 30 pasos desde los mismos pesos. `Adam(weight_decay=0,1)` y Adam sobre
-    `bce + 0,1 · penalizacion_l2` difieren como máximo en $5{,}6\times10^{-17}$ (iguales a precisión de
+    `bce + 0,1 · penalizacion_l2` difieren en menos de $10^{-16}$ (iguales a precisión de
     máquina en cada paso). `AdamW` se separa en 0,58.
   - Comando: `python -m pytest tests/test_optim.py -k weight_decay`.
-- **5. Corrección:** dentro de Adam, el `weight_decay` acoplado **sí** equivale a una L2 en la pérdida
-  (con el factor ½). Lo que no es equivalente es la L2 frente al decaimiento desacoplado (AdamW). El
+- **5. Corrección:** con `weight_decay=λ`, Adam minimiza exactamente $L + \tfrac{\lambda}{2}\lVert w\rVert^2$:
+  el `weight_decay` acoplado **sí** es una L2 en la pérdida, y la única diferencia con "sumar λ‖w‖²" es el
+  factor ½ (equivale a usar 2λ). Lo que no equivale a una L2 es el decaimiento desacoplado de AdamW. El
   único reparo real al uso de `weight_decay` en la red de PD es que también penaliza los sesgos
   (sección 3.5).
 - **6. Lección:** cuando una IA dice "A no equivale a B", escribir las dos actualizaciones y
@@ -39,12 +43,41 @@ en ese momento.
 
 ---
 
-### P3-2. "La MSE tiende a encoger las predicciones hacia la media" (como defecto propio de la MSE)
+### JR-2. "La MSE tiende a encoger las predicciones hacia la media" (como defecto propio de la MSE)
 
 - **Categoría:** conceptos
 - **IA:** Claude (Claude Code, Opus 5.5) · **fecha:** 2026-10-24
-- **1. Prompt (literal; mensaje largo, se cita su comienzo):**
-  > Antes de escribir código, quiero confirmar que entendiste mi rol y acordar un plan...
+- **1. Prompt (literal; entre corchetes, los nombres internos de los roles del equipo):**
+  > Antes de escribir código, quiero confirmar que entendiste mi rol y acordar un plan.
+  >
+  > PARTE A. Confirmación de comprensión (con tus palabras, no copies la guía)
+  > Soy [mi rol] (Optimización, regularización y pérdidas). Explícame:
+  > 1. Qué tengo que entregar en la Parte 1 (PD) y en la Parte 2 (LGD).
+  > 2. Qué artefactos son míos (módulos, configs, secciones del reporte, modelos exportados) y cuáles solo reviso o consumo.
+  > 3. Qué contratos de la sección 7 de la guía me involucran (por ejemplo get_loss(name), build_mlp(cfg), load_splits, metrics.*) y quién produce o consume cada uno.
+  > 4. Qué me toca en cada fase (0 a 10) y qué parte de la cacería de la alucinación y del video individual es mía.
+  > 5. A quién reviso en el anillo y quién me revisa a mí.
+  > Si algo de la guía es ambiguo o contradictorio, dímelo en vez de asumir.
+  >
+  > PARTE B. Estado real del repo
+  > Con base en lo que ya leíste (estructura, git log, ramas remotas, src/), dime qué existe y qué falta de lo que yo necesito de [los demás integrantes]. Marca cada dependencia como "disponible", "parcial" o "bloqueada".
+  >
+  > PARTE C. Plan de trabajo para terminar mi parte con éxito
+  > Propón un plan por etapas, en orden, donde cada etapa indique:
+  > - Qué hago y qué archivos toca.
+  > - De qué depende (y si puedo avanzar con datos sintéticos mientras espero).
+  > - Cómo verifico que quedó bien (pruebas, verificación de gradientes contra autograd y diferencias finitas, comparación contra una implementación de referencia).
+  >
+  >
+  > PARTE D. Decisiones abiertas
+  > Lista las decisiones técnicas que debo tomar o acordar con el equipo antes de avanzar (framework, política de semillas, tratamiento de 0 y 1 en la Beta, pérdida candidata para LGD, presupuesto de búsqueda, etc.). Para cada una, da las opciones con sus pros y contras y tu recomendación, pero no decidas por mí.
+  >
+  > Reglas para esta conversación:
+  > - No escribas ni modifiques archivos todavía. Solo responde.
+  > - Explícame el porqué de cada paso, porque tengo que poder defender y explicar mi parte en la sustentación.
+  > - Cuando empecemos a implementar, quiero ir paso a paso, una etapa por vez, y que me expliques cada decisión antes de aplicarla.
+  > - No cites referencias bibliográficas de memoria; si hace falta una, márcala como "por verificar".
+  > .no hacer comit sin mi permiso y me dices en que momento es recomendable hacerlo y tamvien dime como deberia capturar alucinaciones?
 - **2. Respuesta de la IA (parte relevante, literal):**
   > **MSE**: simple y coincide con la métrica RMSE, pero supone ruido gaussiano y tiende a encoger las
   > predicciones hacia la media.
@@ -62,7 +95,7 @@ en ese momento.
 
 ---
 
-### P3-3. "La Beta con φ constante es exacta en los deciles bajos" (comparación mal planteada)
+### JR-3. "La Beta con φ constante es exacta en los deciles bajos" (comparación mal planteada)
 
 - **Categoría:** conceptos (varianza condicional frente a marginal)
 - **IA:** Claude (Claude Code, Opus 5.5) · **fecha:** 2026-10-25
@@ -89,7 +122,7 @@ en ese momento.
 
 ---
 
-### P3-4. "El techo de la tanh subestimaría de forma sistemática los créditos de LGD alta"
+### JR-4. "El techo de la tanh subestimaría de forma sistemática los créditos de LGD alta"
 
 - **Categoría:** conceptos (confundir error individual con sesgo de la media condicional)
 - **IA:** Claude (Claude Code, Opus 5.5) · **fecha:** 2026-10-25
@@ -118,14 +151,14 @@ en ese momento.
     `lgd_techo_relu.csv`.
 - **5. Corrección:** el mecanismo propuesto (saturación de la tanh) es real, pero no sesga la media
   condicional. La subpredicción de los créditos de LGD muy alta es el encogimiento hacia la media
-  condicional (P3-2), común a todos los modelos.
+  condicional (JR-2), común a todos los modelos.
 - **6. Lección:** para afirmar que un modelo "subestima" un grupo hay que comparar medias predichas y
   observadas dentro de grupos definidos por la **predicción** (calibración por deciles), no mirar los
   valores individuales extremos.
 
 ---
 
-### P3-5. "La Beta subestima por la asimetría a la izquierda; esto explica su peor RMSE" (causa sin evidencia)
+### JR-5. "La Beta subestima por la asimetría a la izquierda; esto explica su peor RMSE" (causa sin evidencia)
 
 - **Categoría:** conceptos (atribuir una causa sin comprobarla)
 - **IA:** Claude (Claude Code, Opus 5.5) · **fecha:** 2026-10-25
@@ -143,8 +176,9 @@ en ese momento.
     sino sus log-momentos. Con $\varepsilon = 10^{-4}$: $\psi(\alpha) - \psi(\alpha+\beta) = -0{,}42850$,
     igual a la media de $\ln y$, y $\psi(\beta) - \psi(\alpha+\beta) = -1{,}53511$, igual a la media de
     $\ln(1-y)$.
-  - **Control.** Con datos simulados de una Beta, la media ajustada coincide con la muestral (diferencia
-    +0,0001). Con la LGD real queda 0,0095 por debajo de la media (0,6944 frente a 0,7039), con
+  - **Control.** Con 41.173 valores simulados de la Beta ajustada (semilla 0), la media ajustada coincide
+    con la muestral (diferencia +0,0003). Con la LGD real queda 0,0095 por debajo de la media (0,694 frente
+    a 0,704), con
     $\varepsilon$ = $10^{-2}$, $10^{-3}$ o $10^{-4}$, y también sin los 284 valores exactamente 0 o 1
     (−0,0099).
   - **Lo que no está probado:** que la causa sea la asimetría a la izquierda, ni que esto explique por sí
@@ -161,7 +195,7 @@ en ese momento.
 
 ---
 
-### Verificaciones de P3 sin hallazgo
+### Verificaciones sin hallazgo (Juan David Robayo)
 
 Afirmaciones (de una IA o propias) que se comprobaron y resultaron correctas, más un problema de código
 encontrado al verificar.
@@ -178,6 +212,7 @@ encontrado al verificar.
 | Adam es invariante a la escala de la pérdida y SGD no | `test_adam_invariante_a_la_escala_y_sgd_no` | correcto |
 | SGD diverge en $f = (100x^2 + y^2)/2$ si $\eta > 2/100$ | ejecución: converge con 0,019 y diverge con 0,021; `test_cuadratica_mal_condicionada_sgd_diverge_y_adam_converge` | correcto |
 | Revisión automática de Sourcery (otra IA) sobre el PR #9: carga insegura con joblib, NaN en `gradiente_beta` con logits extremos y carpeta de figuras inexistente | lectura del código | las tres observaciones son correctas o parcialmente correctas; ninguna es una alucinación |
+| Referencias APA de 3.3, 3.5 y 5.1 entregadas por una IA como "verificadas" (2026-10-30; el prompt no se conservó, por eso no se registra como hallazgo) | Crossref (`api.crossref.org/works/<DOI>`), arXiv, JMLR y el registro del libro de MIT Press | **Errores encontrados:** para Papke y Wooldridge (1996) dio dos DOI distintos, y el de la forma `(199611/12)` no está en Crossref (el correcto termina en `(199611)11:6<619::AID-JAE418>3.0.CO;2-1`); para Platt dio 1999 y 2000 en la misma respuesta (el libro de MIT Press es de 2000); omitió el número 85 de scikit-learn en *JMLR* 12; citó ICLR como "Proceedings" aunque no tiene actas formales. Las otras seis entradas eran correctas. Se corrigieron en las secciones |
 
-**Tabla.** Verificaciones hechas por P3. *Fuente:* elaboración propia; pruebas en `tests/test_losses.py` y
+**Tabla.** Verificaciones hechas por Juan David Robayo. *Fuente:* elaboración propia; pruebas en `tests/test_losses.py` y
 `tests/test_optim.py`.

@@ -1,5 +1,5 @@
 data:
-  scheme: temporal          # misma partición que la red de PD (P2)
+  scheme: temporal          # misma partición que la red de PD
 
 model:
   max_iter: 1000

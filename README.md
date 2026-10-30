@@ -30,6 +30,10 @@ python -m venv .venv
 source .venv/Scripts/activate      # Git Bash en Windows
 # .venv\Scripts\Activate.ps1       # PowerShell
 pip install -r requirements.txt
+
+$env:ME_PRESTAS_REPO_URL="https://github.com/jcuartasl/RNA_20262_mePrestas"
+$env:ME_PRESTAS_REPORT_URL="por definir"
+$env:ME_PRESTAS_VIDEO_URL="por definir"
 ```
 
 ## Datos

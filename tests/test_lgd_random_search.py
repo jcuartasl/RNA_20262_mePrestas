@@ -48,7 +48,16 @@ def test_busqueda_pareada_registra_y_ordena(tmp_path):
     assert ((por_config["beta"] - por_config["mse"]) == 1).all()
     assert (por_config["bce"] == por_config["mse"]).all()
     mejores = mejor_por_perdida(tabla)
-    assert sorted(mejores["perdida"]) == sorted(PERDIDAS) and mejores["rmse"].iloc[0] == tabla["rmse"].min()
+    assert sorted(mejores["perdida"]) == sorted(PERDIDAS) and mejores["rmse"].iloc[0] <= tabla["rmse"].min() + 2.5e-4
+
+
+def test_desempate_por_dispersion_dentro_de_la_tolerancia():
+    tabla = pd.DataFrame({"perdida": ["mse", "bce", "beta"], "rmse": [0.1000, 0.1001, 0.1050],
+                          "sd_pred": [0.090, 0.095, 0.120]})
+    # mse y bce empatan: gana la menos encogida (bce); la beta queda fuera aunque tenga más dispersión
+    assert list(mejor_por_perdida(tabla)["perdida"]) == ["bce", "mse", "beta"]
+    # fuera de la tolerancia manda el rmse
+    assert list(mejor_por_perdida(tabla, tolerancia=1e-5)["perdida"]) == ["mse", "bce", "beta"]
 
 
 def test_la_config_final_escrita_reproduce_la_ganadora(tmp_path):

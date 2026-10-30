@@ -33,15 +33,14 @@ pip install -r requirements.txt
 
 #Definición de variables de entorno que se leen en la app web
 $env:ME_PRESTAS_REPO_URL="https://github.com/jcuartasl/RNA_20262_mePrestas"
-$env:ME_PRESTAS_REPORT_URL="por definir"
 $env:ME_PRESTAS_VIDEO_URL="por definir"
 ```
 
 ## Datos
-- Fuente: Kaggle, Credit Risk Analysis (ranadeep). Fecha de descarga: <fecha>.
-- Registros: <n> · Variables: <n> · Periodo: <desde–hasta>.
-- Datos procesados incluidos en `data/processed/`; cómo se generaron: `python -m src.experiments.prepare_data`.
-- Si no tienes el archivo original, no hace falta: el repo trae la versión procesada.
+-Fuente: Kaggle, Credit Risk Analysis (ranadeep). Fecha de descarga: 17 de octubre de 2026.
+-Registros originales: 887.379 · Variables: 74 · Periodo de originación: junio de 2007 a diciembre de 2015 (ver docs/blog/-ficha_tecnica_dataset.md).
+-Datos procesados incluidos en data/processed/ y particiones en data/splits/; se generan con python -m src.experiments.prepare_data.
+No hace falta el archivo original (loan.csv, más de 400 MB): el repo trae la versión procesada. El diccionario de variables está en data/raw/LCDataDictionary.xlsx.
 
 ## Ejecución (un comando por experimento)
 | Qué | Comando |

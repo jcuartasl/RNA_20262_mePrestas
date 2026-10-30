@@ -71,9 +71,14 @@ def buscar_lgd(datos, base, n_configs=12, seed=90, ruta_tabla=None, ruta_log=LOG
     return tabla
 
 
-def mejor_por_perdida(tabla):
-    """La fila de menor rmse de cada pérdida (a estas se les hacen las 30 semillas)."""
-    return tabla.loc[tabla.groupby("perdida")["rmse"].idxmin()].sort_values("rmse").reset_index(drop=True)
+def mejor_por_perdida(tabla, tolerancia=2.5e-4):
+    """La fila de menor rmse de cada pérdida; las empatadas con la mejor van primero, la menos encogida antes."""
+    mejores = tabla.loc[tabla.groupby("perdida")["rmse"].idxmin()]
+    # desempate prerregistrado (sección 3.3): una diferencia menor que la sd entre semillas (~2.5e-4) es empate;
+    # todas las redes encogen las predicciones, así que la de mayor sd_pred es la más cercana a la observada
+    empatadas = mejores[mejores["rmse"] <= mejores["rmse"].min() + tolerancia].sort_values("sd_pred", ascending=False)
+    resto = mejores.drop(empatadas.index).sort_values("rmse")
+    return pd.concat([empatadas, resto]).reset_index(drop=True)
 
 
 def config_de_fila(base, fila):

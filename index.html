@@ -7,7 +7,6 @@
     <meta name="theme-color" content="#101d19">
     <title>¿Me prestas? — Laboratorio de riesgo</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
         :root {
             --bg: #101d19;
@@ -20,8 +19,8 @@
             --cyan: #75e6d1;
             --line: #496254;
             --amber: #ffc36e;
-            --mono: 'DM Mono', monospace;
-            --sans: 'Space Grotesk', sans-serif;
+            --mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+            --sans: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             --shadow: 5px 5px 0 #080f0d
         }
 
@@ -689,6 +688,13 @@
         }
 
         
+
+        .group-title { font: 11px var(--mono); color: var(--lime); letter-spacing: .08em; text-transform: uppercase; margin: 22px 0 -4px; border-bottom: 1px dashed var(--line); padding-bottom: 6px }
+        .numbox { margin-top: 8px }
+        .info { color: var(--cyan); cursor: help; font: 11px var(--mono) }
+        details.adv { margin-top: 20px; border: 1px solid var(--line); padding: 10px 14px; background: #14241d }
+        details.adv summary { cursor: pointer; font: 12px var(--mono); color: var(--cyan) }
+        .label-line output { text-align: right }
     </style>
 </head>
 
@@ -714,116 +720,81 @@
             </div>
             <div class="hero-art">
                 <div class="pixel-card">
-                    <div class="pixel-top"><span>DEMO / PERFIL #0042</span><span>● SISTEMA ACTIVO</span></div>
+                    <div class="pixel-top"><span>PERFIL / SIMULADOR</span><span>● MODELOS GUARDADOS</span></div>
                     <div class="score-preview">
-                        <div class="big-score" id="heroScore">642<small>PUNTAJE SIMULADO</small></div>
-                        <div class="stamp">DATOS<br>DEMO</div>
+                        <div class="big-score" id="heroScore">—<small>PUNTAJE DEL PERFIL</small></div>
+                        <div class="stamp">MODELO<br>REAL</div>
                     </div>
                     <div class="mini-bars" aria-hidden="true"><i style="--h:24%"></i><i style="--h:38%"></i><i
                             style="--h:31%"></i><i style="--h:54%"></i><i style="--h:45%"></i><i style="--h:68%"></i><i
                             style="--h:56%"></i><i style="--h:84%"></i><i style="--h:72%"></i><i style="--h:95%"></i>
                     </div>
                     <div class="pixel-top" style="border:0;padding:12px 0 0"><span>PD ESTIMADA</span><span
-                            id="heroPd">18.4%</span></div>
+                            id="heroPd">—</span></div>
                 </div>
             </div>
         </section>
-        <div class="ticker"><span>✳ DATOS SINTÉTICOS PARA PROTOTIPADO &nbsp; ✳ NO USAR PARA DECISIONES FINANCIERAS
-                &nbsp; ✳ RESULTADOS FICTICIOS &nbsp; ✳ PD × LGD × EAD &nbsp; ✳ DATOS SINTÉTICOS PARA PROTOTIPADO &nbsp;
-                ✳ NO USAR PARA DECISIONES FINANCIERAS &nbsp; ✳</span></div>
-        <div class="wrap notice"><b>AVISO / DEMO</b><span>Esta página funciona con datos y métricas ficticios. Los
-                valores sirven para probar la interfaz y no son resultados del conjunto de Kaggle ni predicciones de un
-                modelo entrenado. Sustitúyanlos por resultados reproducibles antes de publicar el informe.</span></div>
+        <div class="ticker"><span>✳ MODELOS ENTRENADOS DEL PROYECTO &nbsp; ✳ PROTOTIPO ACADÉMICO &nbsp; ✳ PD × LGD × EAD &nbsp; ✳ RESULTADOS LEÍDOS DE results/ &nbsp;</span></div>
+        <div class="wrap notice"><b>AVISO</b><span>Prototipo académico. Los modelos se entrenaron con créditos de Lending Club (EE. UU., 2007–2015) y sus montos están en <b>dólares</b>: el formulario pide USD y muestra equivalentes en COP solo como referencia. Los datos opcionales que dejes vacíos se completan con la mediana o moda del entrenamiento y el resultado los lista. No es una decisión real de crédito.</span></div>
         <section class="wrap section" id="simulador">
             <div class="section-head">
                 <div>
                     <div class="eyebrow">01 — Explora el modelo</div>
                     <h2>Simulador de perfil</h2>
                 </div>
-                <p>Mueve los controles para observar el efecto ilustrativo sobre probabilidad, puntaje y pérdida
-                    esperada.</p>
+                <p>Caso de uso: <b>pre-aprobación</b> de un crédito de consumo. Solo se piden datos declarados por el solicitante y de buró que existen <b>antes del desembolso</b>. Los campos vienen de los modelos guardados.</p>
             </div>
             <div class="grid2">
                 <div class="panel">
-                    <div class="panel-title"><span>ENTRADA / CLIENTE</span><span>● LIVE</span></div>
-                    <div class="panel-body">
-                        <p>Información del cliente</p>
-                    </div>
+                    <div class="panel-title"><span>ENTRADA / SOLICITANTE (USD)</span><span id="connectionStatus">● CONECTANDO</span></div>
+                    <div id="formBasico"></div>
+                    <details class="adv">
+                        <summary>Datos avanzados de buró y perfil (opcionales)</summary>
+                        <p class="tiny" style="margin:10px 0 0">Si dejas un campo vacío, el modelo usa la mediana (números) o la moda (categorías) del entrenamiento; el resultado te dice cuáles se completaron así.</p>
+                        <div id="formAvanzado"></div>
+                    </details>
+                    <div class="btnrow"><button class="btn" id="randomize">↻ PERFIL ALEATORIO</button><button class="btn secondary" id="reset">RESTABLECER</button></div>
                 </div>
                 <div class="panel">
-                    <div class="panel-title"><span>ENTRADA / CLIENTE</span><span>● LIVE</span></div>
-                    <div class="panel-body">
-                        <p>Información del cliente</p>
-                    </div>
-                </div>
-            </div>
-            <div class="grid2">
-                <div class="panel">
-                    <div class="panel-title"><span>ENTRADA / CLIENTE</span><span>● LIVE</span></div>
-                    +<div class="form-row">
-                        <div class="label-line"><label for="income">Ingreso mensual</label><output
-                                id="incomeOut">$3.200.000</output></div><input id="income" type="range" min="800000"
-                            max="10000000" step="100000" value="3200000">
-                        <div class="range-ends"><span>$800 mil</span><span>$10 millones</span></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="label-line"><label for="debt">Relación deuda / ingreso</label><output
-                                id="debtOut">32%</output></div><input id="debt" type="range" min="5" max="90"
-                            value="32">
-                        <div class="range-ends"><span>5%</span><span>90%</span></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="label-line"><label for="history">Antigüedad del historial</label><output
-                                id="historyOut">8 años</output></div><input id="history" type="range" min="0" max="30"
-                            value="8">
-                        <div class="range-ends"><span>0 años</span><span>30 años</span></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="label-line"><label for="loan">Monto solicitado</label><output
-                                id="loanOut">$12.000.000</output></div><input id="loan" type="range" min="1000000"
-                            max="50000000" step="500000" value="12000000">
-                        <div class="range-ends"><span>$1 millón</span><span>$50 millones</span></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="label-line"><label for="term">Plazo del crédito</label></div><select
-                            class="selectbox" id="term">
-                            <option value="36">36 meses</option>
-                            <option value="60">60 meses</option>
-                        </select>
-                    </div>
-                    <div class="btnrow"><button class="btn" id="randomize">↻ PERFIL ALEATORIO</button><button
-                            class="btn secondary" id="reset">RESTABLECER</button></div>
-                </div>
-                <div class="panel">
-                    <div class="panel-title"><span>SALIDA / ESTIMACIÓN</span><span id="riskTag">RIESGO MEDIO</span>
-                    </div>
+                    <div class="panel-title"><span>SALIDA / ESTIMACIÓN</span><span id="riskTag">—</span></div>
                     <div class="results">
-                        <div class="metric"><span>Prob. incumplimiento · PD</span><strong
-                                id="pdValue">18.4%</strong><small>Estimación ilustrativa</small>
-                            <div class="meter"><i id="pdMeter" style="--value:18.4%"></i></div>
-                        </div>
-                        <div class="metric"><span>Puntaje de prueba</span><strong
-                                id="scoreValue">642</strong><small>0–850 puntos · demo</small>
-                            <div class="meter"><i id="scoreMeter" style="--value:75%"></i></div>
-                        </div>
-                        <div class="metric"><span>LGD simulada</span><strong id="lgdValue">46%</strong><small>Fracción
-                                perdida si incumple</small></div>
-                        <div class="metric"><span>Pérdida esperada · E[L]</span><strong
-                                id="lossValue">$1,016,640</strong><small>PD × LGD × EAD (EAD = monto)</small></div>
+                        <div class="metric"><span>Prob. incumplimiento · PD</span><strong id="pdValue">—</strong><small>Estimada por la red neuronal</small>
+                            <div class="meter"><i id="pdMeter" style="--value:0%"></i></div></div>
+                        <div class="metric"><span>Puntaje en la scorecard</span><strong id="scoreValue">—</strong><small id="scoreSmall">Mayor puntaje, menor riesgo</small></div>
+                        <div class="metric"><span>Percentil frente a la población</span><strong id="percentileValue">—</strong><small>% de la población de entrenamiento con puntaje menor</small>
+                            <div class="meter"><i id="percentileMeter" style="--value:0%"></i></div></div>
+                        <div class="metric"><span>LGD estimada</span><strong id="lgdValue">—</strong><small>Fracción perdida si incumple</small></div>
+                        <div class="metric" style="grid-column:1/-1"><span>Pérdida esperada · E[L]</span><strong id="lossValue">—</strong><small id="lossSmall">PD × LGD × EAD (EAD = monto solicitado)</small></div>
                     </div>
-                    <p class="result-note">* Fórmulas pedagógicas con parámetros inventados; no representa un modelo
-                        ajustado.</p>
-                    <div style="margin-top:22px">
-                        <div class="panel-title"><span>DESGLOSE DEL PUNTAJE</span></div>
-                        <div class="scoreline"><span>Base de referencia</span><strong>600</strong></div>
-                        <div class="scoreline"><span>Deuda / ingreso</span><strong id="debtPoints">−26 pts</strong>
+                    <canvas id="popChart" height="120" style="width:100%;margin-top:16px" aria-label="Distribución de puntajes de la población y tu posición"></canvas>
+                    <div class="chart-legend"><span><i class="dot"></i>Población de entrenamiento</span><span><i class="dot pink"></i>Tu puntaje</span></div>
+                    <p class="result-note">Esperando respuesta de la API…</p>
+                    <ul id="avisos" class="tiny" style="margin:10px 0 0 18px;color:var(--amber)"></ul>
+                    <details class="adv" id="defaultsBox" style="display:none"><summary id="defaultsSummary"></summary><p class="tiny" id="defaultsList" style="margin:8px 0 0"></p></details>
+                </div>
+            </div>
+            <div class="panel" style="margin-top:18px">
+                <div class="panel-title"><span>¿QUÉ PASARÍA SI…?</span><span id="wiStatus">—</span></div>
+                <div class="panel-body">
+                    <div class="grid2">
+                        <div>
+                            <div class="form-row">
+                                <div class="label-line"><label for="wiVar">Característica a cambiar</label></div>
+                                <select class="selectbox" id="wiVar"></select>
+                            </div>
+                            <div class="form-row">
+                                <div class="label-line"><label for="wiVal">Nuevo valor</label><output id="wiOut"></output></div>
+                                <div id="wiControl"></div>
+                            </div>
+                            <p class="tiny">Se compara con el perfil de arriba cambiando solo esa característica; el resto se mantiene igual.</p>
                         </div>
-                        <div class="scoreline"><span>Historial crediticio</span><strong id="historyPoints">+32
-                                pts</strong></div>
-                        <div class="scoreline"><span>Ingreso mensual</span><strong id="incomePoints">+36 pts</strong>
-                        </div>
+                        <div id="wiResult" class="tiny">Mueve el control para comparar.</div>
                     </div>
                 </div>
+            </div>
+            <div class="panel" style="margin-top:18px">
+                <div class="panel-title"><span>¿QUÉ DATOS USA EL MODELO?</span><span>COHERENCIA</span></div>
+                <p class="tooltip" style="margin:0">El preprocesador guardado exige 28 variables. El formulario pide las 21 que un solicitante puede declarar o consultar en buró. Las otras siete se fijan: <code>funded_amnt</code> y <code>funded_amnt_inv</code> (= monto solicitado, que además es la EAD), <code>policy_code</code> = 1, <code>pymnt_plan</code> = n, <code>application_type</code> = INDIVIDUAL, <code>initial_list_status</code> (moda del entrenamiento) y <code>earliest_cr_line</code>. Esta última no se pregunta porque en el preprocesador todas sus categorías mes-año quedaron agrupadas como «infrecuentes» (menos de 1 % cada una), así que no cambia ninguna predicción. Variables de fuga (<code>grade</code>, <code>int_rate</code>, pagos, recuperaciones) no existen en el modelo. Significados: <code>LCDataDictionary.xlsx</code> del conjunto de Kaggle (pasa el cursor sobre ⓘ).</p>
             </div>
         </section>
         <section class="wrap section" id="resultados">
@@ -832,30 +803,25 @@
                     <div class="eyebrow">02 — Lectura de resultados</div>
                     <h2>Modelos en comparación</h2>
                 </div>
-                <p>Panel de muestra con métricas ficticias. Actualiza las curvas al cambiar entre particiones simuladas.
-                </p>
+                <p>Métricas leídas de <code>results/tables</code> al cargar la página: prueba temporal (originaciones de 2015).</p>
             </div>
             <div class="stats">
-                <div class="stat"><label>AUC · Regresión logística</label><b>0.71</b><small>Referencia
-                        [FICTICIA]</small></div>
-                <div class="stat"><label>AUC · Red neuronal</label><b>0.73</b><small>MLP [FICTICIA]</small></div>
-                <div class="stat"><label>KS · Red neuronal</label><b>0.34</b><small>Prueba [FICTICIA]</small></div>
-                <div class="stat"><label>Brier · Red neuronal</label><b>0.18</b><small>Menor es mejor [FICTICIO]</small>
-                </div>
+                <div class="stat"><label>AUC · Regresión logística</label><b id="mAucLog">—</b><small>Referencia</small></div>
+                <div class="stat"><label>AUC · Red neuronal</label><b id="mAucMlp">—</b><small>MLP</small></div>
+                <div class="stat"><label>KS · Red neuronal</label><b id="mKsMlp">—</b><small>Prueba temporal</small></div>
+                <div class="stat"><label>Brier · Red neuronal</label><b id="mBrierMlp">—</b><small>Menor es mejor</small></div>
             </div>
+            <p class="tiny" id="metricNote" style="margin-top:10px"></p>
             <div class="panel" style="margin-top:18px">
-                <div class="panel-title"><span>CURVAS DE VALIDACIÓN / ILUSTRATIVAS</span><span id="chartType">ROC</span>
+                <div class="panel-title"><span>FIGURAS DEL PROYECTO</span><span id="chartType">CALIBRACIÓN PD</span></div>
+                <div class="tabbar">
+                    <button class="tab active" data-fig="p4_pd_calibracion_test_temporal.png" data-title="CALIBRACIÓN PD">CALIBRACIÓN PD</button>
+                    <button class="tab" data-fig="p4_scorecard_mlp_test.png" data-title="SCORECARD (RED)">SCORECARD</button>
+                    <button class="tab" data-fig="lgd_pred_vs_obs.png" data-title="LGD PREDICHA VS OBSERVADA">LGD</button>
+                    <button class="tab" data-fig="el_comparacion_modelos.png" data-title="PÉRDIDA ESPERADA">PÉRDIDA ESPERADA</button>
                 </div>
-                <div class="tabbar"><button class="tab active" data-chart="roc">ROC</button><button class="tab"
-                        data-chart="calibration">CALIBRACIÓN</button><button class="tab" data-chart="distribution">LGD /
-                        DISTRIBUCIÓN</button></div>
-                <div class="chart-wrap"><canvas id="chart" aria-label="Gráfico de métricas ficticias"
-                        role="img"></canvas></div>
-                <div class="chart-legend"><span><i class="dot"></i><span id="legendOne">MLP
-                            sintético</span></span><span><i class="dot pink"></i><span id="legendTwo">Regresión
-                            logística sintética</span></span></div>
-                <p class="tiny">Visualizaciones construidas con coordenadas generadas para la demo. Reemplazar con
-                    salidas de evaluación reales.</p>
+                <div class="chart-wrap" style="height:auto"><img id="figImg" alt="Figura de resultados del proyecto" style="max-width:100%;height:auto;display:block;margin:0 auto;background:#fff;border-radius:6px"></div>
+                <p class="tiny" id="figNote">Imágenes generadas por el código del repositorio (<code>results/figures</code>). Su numeración y fuente aparecen en el reporte técnico.</p>
             </div>
         </section>
         <section class="wrap section" id="metodo">
@@ -892,81 +858,302 @@
             <div class="section-head">
                 <div>
                     <div class="eyebrow">04 — Preguntas del equipo</div>
-                    <h2>Hipótesis por comprobar</h2>
+                    <h2>Hipótesis y veredictos</h2>
                 </div>
-                <p>Ejemplos de hipótesis de trabajo, todavía sin validar. Sustituyan el estado tras explorar los datos
-                    reales.</p>
+                <p>Veredictos tomados de docs/hipotesis.md; contrastes en results/tables/p4_hipotesis_contraste.csv.</p>
             </div>
-            <div class="hypotheses">
-                <article class="hypo">
-                    <div class="n">HIPÓTESIS / 01</div>
-                    <h3>Más deuda, mayor riesgo</h3>
-                    <p>Una relación deuda/ingreso alta podría asociarse con una tasa de incumplimiento superior.</p>
-                    <span class="status">PENDIENTE DE ANÁLISIS</span>
-                </article>
-                <article class="hypo">
-                    <div class="n">HIPÓTESIS / 02</div>
-                    <h3>El historial aporta señal</h3>
-                    <p>La antigüedad del historial podría relacionarse con diferencias en el comportamiento de pago.</p>
-                    <span class="status">PENDIENTE DE ANÁLISIS</span>
-                </article>
-                <article class="hypo">
-                    <div class="n">HIPÓTESIS / 03</div>
-                    <h3>PD no cuenta toda la historia</h3>
-                    <p>Dos perfiles con igual probabilidad de incumplimiento pueden tener pérdidas distintas si difiere
-                        su exposición o recuperación.</p><span class="status">PENDIENTE DE ANÁLISIS</span>
-                </article>
-            </div>
+            <div class="hypotheses"><article class="hypo"><div class="n">HIPÓTESIS / H1</div><h3>Más deuda, mayor riesgo</h3><p>DTI sobre el percentil 75 frente a DTI menor de 15: tasa de incumplimiento 24,9 % vs 15,8 % (entrenamiento) y 36,2 % vs 19,1 % (2015).</p><span class="status">CONFIRMADA</span></article><article class="hypo"><div class="n">HIPÓTESIS / H3</div><h3>Uso del crédito rotativo</h3><p>Con revol_util mayor de 80 % hay más riesgo, pero la relación es casi lineal y no acelera cerca del límite.</p><span class="status">PARCIALMENTE CONFIRMADA</span></article><article class="hypo"><div class="n">HIPÓTESIS / H2 / H4</div><h3>Consultas recientes y antigüedad laboral</h3><p>H2 queda por debajo del umbral de razón 1,5 y H4 cambia de signo entre muestras (sesgo de madurez en 2015).</p><span class="status">NO CONFIRMADAS</span></article><article class="hypo"><div class="n">HIPÓTESIS / H5</div><h3>El monto agranda la pérdida</h3><p>LGD media 0,676 vs 0,582 entre créditos grandes y pequeños, en buena parte por el plazo.</p><span class="status">CONFIRMADA (efecto pequeño)</span></article></div>
         </section>
         <section class="wrap section">
             <div class="section-head">
                 <div>
-                    <div class="eyebrow">05 — Próximos pasos</div>
-                    <h2>Completa el reporte</h2>
+                    <div class="eyebrow">05 — Enlaces</div>
+                    <h2>Reporte, código y video</h2>
                 </div>
-                <p>Conecta este prototipo visual con el análisis y los artefactos reproducibles del equipo.</p>
+                <p>Enlaces del trabajo.</p>
             </div>
             <div class="panel">
-                <div class="links"><a href="#">REPOSITORIO GIT ↗</a><a href="#">APLICACIÓN ↗</a><a href="#">VIDEO
-                        PROMOCIONAL ↗</a></div>
-                <p class="tooltip" style="margin:20px 0 0">Sustituye los enlaces de ejemplo. Añade tablas y figuras
-                    numeradas con fuente, bibliografía APA 7 verificada, la sección de uso de IA y la cacería de
-                    alucinaciones con evidencia real. Consulta el diccionario de datos para describir las variables.</p>
+                <div class="links"><a id="lnkRepo" href="#">REPOSITORIO GIT ↗</a><a id="lnkReport" href="#">REPORTE TÉCNICO ↗</a><a id="lnkVideo" href="#">VIDEO PROMOCIONAL ↗</a></div>
+                <p class="tooltip" id="linksNote" style="margin:20px 0 0">Los enlaces se leen de las variables ME_PRESTAS_REPO_URL, ME_PRESTAS_REPORT_URL y ME_PRESTAS_VIDEO_URL del servidor.</p>
             </div>
         </section>
         </main>
-    <footer class="wrap"><span>¿ME PRESTAS? · PROTOTIPO DE CURSO · 2026</span><span>TODO DATO Y RESULTADO DE ESTA DEMO
-            ES FICTICIO</span></footer>
+    <footer class="wrap"><span>¿ME PRESTAS? · PROTOTIPO DE CURSO · 2026</span><span>PROTOTIPO ACADÉMICO · NO USAR PARA DECISIONES REALES</span></footer>
     
     <script>
-        const $ = s => document.querySelector(s), fmtCOP = n => '$' + Math.round(n).toLocaleString('es-CO'), controls = ['income', 'debt', 'history', 'loan', 'term'];
-        const initial = { income: 3200000, debt: 32, history: 8, loan: 12000000, term: '36' };
-        function compute() {
-            const inc = +$('#income').value, debt = +$('#debt').value, hist = +$('#history').value, loan = +$('#loan').value, term = +$('#term').value;
-            $('#incomeOut').value=fmtCOP(inc); $('#debtOut').value = debt + '%'; $('#historyOut').value = hist + ' años'; $('#loanOut').value = fmtCOP(loan);
-            // Funciones de juguete para actualizar la interfaz. No están entrenadas ni calibradas.
-                let logit = -2.05 + 0.035 * (debt - 30) - 0.055 * (hist - 8) - 0.00000006 * (inc - 3200000) + 0.12 * (term === 60 ? 1 : 0) + 0.000000006 * (loan - 12000000);
-            let pd = 1 / (1 + Math.exp(-logit)), lgd = Math.max(.2, Math.min(.75, .46 + 0.0016 * (debt - 32) + 0.000000002 * (loan - 12000000)));
-            let score = Math.round(Math.max(300, Math.min(850, 600 + 50 * Math.log2((1 - pd) / pd / 20)))); let loss = pd * lgd * loan;
-            $('#pdValue').textContent=(pd * 100).toFixed(1) + '%'; $('#heroPd').textContent = (pd * 100).toFixed(1) + '%'; $('#scoreValue').textContent = score; $('#heroScore').childNodes[0].textContent = score;
-            $('#lgdValue').textContent=(lgd * 100).toFixed(0) + '%'; $('#lossValue').textContent = fmtCOP(loss); $('#pdMeter').style.setProperty('--value', Math.min(100, pd * 100) + '%'); $('#scoreMeter').style.setProperty('--value', ((score - 300) / 550 * 100) + '%');
-            let risk = pd < .12 ? 'RIESGO BAJO' : pd < .25 ? 'RIESGO MEDIO' : 'RIESGO ALTO'; $('#riskTag').textContent = risk; $('#riskTag').style.color = pd < .12 ? 'var(--cyan)' : pd < .25 ? 'var(--amber)' : 'var(--pink)';
-            $('#debtPoints').textContent=(debt < 32 ? '+' : '−') + Math.abs(Math.round((debt - 32) * 1.4)) + ' pts'; $('#historyPoints').textContent = (hist >= 8 ? '+' : '−') + Math.abs(Math.round((hist - 8) * 4)) + ' pts'; $('#incomePoints').textContent = (inc >= 3200000 ? '+' : '−') + Math.abs(Math.round((inc - 3200000) / 50000)) + ' pts';
+    const $ = s => document.querySelector(s);
+    const API_BASE_URL = window.ME_PRESTAS_API_URL ||
+        ((location.protocol.startsWith('http') && location.port !== '5500') ? location.origin : 'http://127.0.0.1:8000');
+    let FX = 4000, CAMPOS = [], POB = null, lastBase = null;
+    let requestNumber = 0, debounceHandle, wiHandle, wiRequest = 0;
+    const usd = n => 'US$' + Math.round(n).toLocaleString('en-US');
+    const copTxt = n => '≈ $' + Math.round(n * FX).toLocaleString('es-CO') + ' COP';
+    const pct = (x, d = 1) => (x * 100).toFixed(d) + '%';
+    const signed = (x, d, unit = '') => (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(d) + unit;
+    const fmtNum = v => Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
+    // pasos de los deslizadores (solo variables numéricas de uso frecuente); el resto usa caja numérica
+    const STEP = { loan_amnt: 500, annual_inc: 1000, dti: 0.5, revol_util: 1 };
+    const BASICO_SLIDER = new Set(Object.keys(STEP));
+
+    function showStatus(message, color) {
+        const el = $('#connectionStatus'); el.textContent = '● ' + message; el.style.color = color || 'var(--muted)';
+    }
+    async function api(path, body) {
+        const response = await fetch(API_BASE_URL + path, body === undefined ? {} : {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `Error HTTP ${response.status}`);
+        return data;
+    }
+    const sliderRange = c => {
+        const step = STEP[c.clave] || 1;
+        let lo = Math.min(c.p01 ?? 0, c.defecto), hi = Math.max(c.p99 ?? c.defecto * 2, c.defecto);
+        if (c.min !== null && c.min !== undefined && c.min > 0 && c.min <= lo) lo = c.min;
+        if (c.max !== null && c.max !== undefined) hi = Math.min(hi, c.max);
+        if (c.min === 0) lo = 0;
+        return [Math.floor(lo / step) * step, Math.ceil(hi / step) * step, step];
+    };
+
+    // ------------------------------------------------------------ formulario dinámico (desde /esquema)
+    function crearCampo(c) {
+        const row = document.createElement('div'); row.className = 'form-row'; row.dataset.clave = c.clave;
+        const line = document.createElement('div'); line.className = 'label-line';
+        const lab = document.createElement('label'); lab.htmlFor = 'f_' + c.clave; lab.textContent = c.etiqueta + (c.unidad && c.unidad !== 'n' ? ` (${c.unidad})` : '');
+        const info = document.createElement('span'); info.className = 'info'; info.textContent = ' ⓘ';
+        info.title = c.ayuda + (c.diccionario ? `\n\nDiccionario oficial (LCDataDictionary.xlsx): ${c.diccionario}` : '');
+        lab.appendChild(info);
+        const out = document.createElement('output'); out.id = 'o_' + c.clave;
+        line.append(lab, out); row.appendChild(line);
+        if (c.tipo === 'categoria') {
+            const sel = document.createElement('select'); sel.className = 'selectbox'; sel.id = 'f_' + c.clave;
+            if (c.nivel === 'avanzado') { const o = document.createElement('option'); o.value = ''; o.textContent = '— valor típico —'; sel.appendChild(o); }
+            c.opciones.forEach(op => { const o = document.createElement('option'); o.value = op.valor; o.textContent = op.etiqueta; sel.appendChild(o); });
+            sel.value = c.nivel === 'avanzado' ? '' : c.defecto;
+            sel.addEventListener('input', scheduleCompute); row.appendChild(sel);
+        } else {
+            const num = document.createElement('input'); num.type = 'number'; num.className = 'selectbox numbox'; num.id = 'f_' + c.clave;
+            num.step = c.entero ? 1 : 'any'; if (c.min !== null && c.min !== undefined) num.min = c.min; if (c.max !== null && c.max !== undefined) num.max = c.max;
+            if (c.nivel === 'basico' && BASICO_SLIDER.has(c.clave)) {
+                const [lo, hi, st] = sliderRange(c);
+                const rng = document.createElement('input'); rng.type = 'range'; rng.min = lo; rng.max = hi; rng.step = st; rng.id = 'r_' + c.clave;
+                rng.value = c.defecto; num.value = Math.round(c.defecto * 100) / 100;
+                rng.addEventListener('input', () => { num.value = rng.value; scheduleCompute(); });
+                num.addEventListener('input', () => { rng.value = num.value; scheduleCompute(); });
+                row.append(rng);
+                const ends = document.createElement('div'); ends.className = 'range-ends';
+                ends.innerHTML = '<span></span><span></span>'; ends.children[0].textContent = fmtNum(lo); ends.children[1].textContent = fmtNum(hi);
+                row.append(ends, num);
+            } else {
+                num.value = c.nivel === 'basico' ? Math.round(c.defecto * 100) / 100 : '';
+                if (c.nivel === 'avanzado') num.placeholder = 'típico: ' + fmtNum(c.defecto);
+                num.addEventListener('input', scheduleCompute); row.appendChild(num);
+            }
         }
-            controls.forEach(id => $('#' + id).addEventListener('input', compute));
-        $('#reset').addEventListener('click', () => { Object.entries(initial).forEach(([k, v]) => $('#' + k).value = v); compute() });
-        $('#randomize').addEventListener('click', () => { $('#income').value = 800000 + Math.random() * 9200000; $('#debt').value = 5 + Math.random() * 85; $('#history').value = Math.random() * 30; $('#loan').value = 1000000 + Math.random() * 49000000; $('#term').value = Math.random() < .5 ? '36' : '60'; compute() });
-        const canvas = $('#chart'), ctx = canvas.getContext('2d'); let chart = 'roc';
-        function draw() {
-            const dpr = window.devicePixelRatio || 1, rect = canvas.getBoundingClientRect(); canvas.width = rect.width * dpr; canvas.height = rect.height * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); let w = rect.width, h = rect.height, pad = 38; ctx.clearRect(0, 0, w, h); ctx.strokeStyle = '#385347'; ctx.lineWidth = 1; ctx.fillStyle = '#91a595'; ctx.font = '10px DM Mono, monospace';
-            for (let i = 0; i <= 4; i++) { let x = pad + (w - pad * 1.4) * i / 4, y = h - pad - (h - pad * 1.5) * i / 4; ctx.beginPath(); ctx.moveTo(x, pad); ctx.lineTo(x, h - pad); ctx.stroke(); ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(w - pad / 2, y); ctx.stroke(); ctx.fillText((i * 25) + '%', x - 10, h - pad + 16); ctx.fillText((i * 25) + '%', 4, y + 3) }
-            ctx.strokeStyle='#71877a'; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(pad, h - pad); ctx.lineTo(w - pad / 2, pad); ctx.stroke(); ctx.setLineDash([]);
-            const series = chart === 'roc' ? [[0, 0], [.08, .29], [.19, .48], [.32, .62], [.48, .74], [.67, .85], [.82, .93], [1, 1]] : chart === 'calibration' ? [[0, 0], [.12, .16], [.25, .31], [.38, .4], [.51, .54], [.66, .62], [.8, .82], [1, 1]] : [[0, .1], [.1, .14], [.2, .22], [.3, .38], [.4, .55], [.55, .76], [.7, .9], [1, .98]];
-            function line(points, color, offset = 0) { ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.beginPath(); points.forEach(([x, y], i) => { let xx = pad + (w - pad * 1.4) * x, yy = h - pad - (h - pad * 1.5) * y + (i % 3 === 0 ? offset : 0); i ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy) }); ctx.stroke(); ctx.fillStyle = color; points.forEach(([x, y]) => { ctx.beginPath(); ctx.arc(pad + (w - pad * 1.4) * x, h - pad - (h - pad * 1.5) * y + offset, 3, 0, Math.PI * 2); ctx.fill() }) }line(series, '#d4ff5b'); line(series.map(([x, y]) => [x, Math.max(0, y - .07 * (1 - x))]), '#ff7895', 4);
-            $('#chartType').textContent=chart === 'roc' ? 'ROC' : chart === 'calibration' ? 'CALIBRACIÓN' : 'LGD / DISTRIBUCIÓN'; $('#legendOne').textContent = chart === 'distribution' ? 'LGD observada sintética' : 'MLP sintético'; $('#legendTwo').textContent = chart === 'distribution' ? 'LGD predicha sintética' : 'Regresión logística sintética';
+        return row;
+    }
+    function leerDatos() {
+        const d = {};
+        CAMPOS.forEach(c => {
+            const el = $('#f_' + c.clave); if (!el) return;
+            if (c.tipo === 'numero') { if (el.value !== '') d[c.clave] = Number(el.value); }
+            else if (el.value !== '') d[c.clave] = el.value;
+        });
+        return d;
+    }
+    function actualizarEtiquetas() {
+        CAMPOS.forEach(c => {
+            const o = $('#o_' + c.clave); const el = $('#f_' + c.clave); if (!o || !el) return;
+            if (c.tipo === 'numero' && el.value !== '') o.value = (c.unidad === 'USD' ? usd(Number(el.value)) + ' · ' + copTxt(Number(el.value)) : fmtNum(el.value) + (c.unidad === '%' ? '%' : ''));
+            else o.value = '';
+        });
+    }
+    function fijarValores(vals) {
+        CAMPOS.forEach(c => {
+            const el = $('#f_' + c.clave); if (!el) return; const v = vals[c.clave];
+            el.value = v === undefined ? '' : v;
+            const r = $('#r_' + c.clave); if (r) r.value = el.value;
+        });
+    }
+    function valoresIniciales() {
+        const v = {}; CAMPOS.forEach(c => { if (c.nivel === 'basico') v[c.clave] = c.defecto; }); return v;
+    }
+
+    // ------------------------------------------------------------ cálculo y resultados
+    function dibujarPoblacion(score) {
+        const cv = $('#popChart'); if (!POB || !cv) return;
+        const w = cv.clientWidth || 400, h = 120, dpr = window.devicePixelRatio || 1;
+        cv.width = w * dpr; cv.height = h * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr); g.clearRect(0, 0, w, h);
+        const n = POB.cuentas.length, mx = Math.max(...POB.cuentas), lo = POB.bordes[0], hi = POB.bordes[n], bw = w / n;
+        g.fillStyle = '#75e6d1'; g.globalAlpha = .75;
+        POB.cuentas.forEach((c, i) => { const bh = (c / mx) * (h - 22); g.fillRect(i * bw + 1, h - 16 - bh, bw - 2, bh); });
+        g.globalAlpha = 1;
+        if (score !== undefined) {
+            const x = Math.max(0, Math.min(w, (score - lo) / (hi - lo) * w));
+            g.strokeStyle = '#ff7895'; g.lineWidth = 2; g.beginPath(); g.moveTo(x, 4); g.lineTo(x, h - 16); g.stroke();
         }
-            + document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { document.querySelectorAll('.tab').forEach(x => x.classList.remove('active')); b.classList.add('active'); chart = b.dataset.chart; draw() })); window.addEventListener('resize', draw); compute(); draw();
-        </script>
+        g.fillStyle = '#a4b7a7'; g.font = '10px ui-monospace, monospace';
+        g.textAlign = 'left'; g.fillText(Math.round(lo), 2, h - 3); g.textAlign = 'right'; g.fillText(Math.round(hi), w - 2, h - 3);
+    }
+    async function compute() {
+        actualizarEtiquetas();
+        const current = ++requestNumber; showStatus('CALCULANDO…', 'var(--amber)');
+        try {
+            const d = await api('/predecir', { datos: leerDatos() });
+            if (current !== requestNumber) return;
+            lastBase = d;
+            $('#pdValue').textContent = pct(d.PD, 2); $('#heroPd').textContent = pct(d.PD, 2);
+            $('#scoreValue').textContent = d.Puntaje.toFixed(1);
+            const hs = $('#heroScore'); if (hs && hs.firstChild) hs.firstChild.textContent = Math.round(d.Puntaje);
+            $('#percentileValue').textContent = d.Percentil.toFixed(1);
+            $('#lgdValue').textContent = pct(d.LGD, 1);
+            $('#lossValue').textContent = usd(d.Perdida_esperada_USD) + ' · ' + copTxt(d.Perdida_esperada_USD);
+            $('#lossSmall').textContent = `PD × LGD × EAD = ${pct(d.PD, 2)} × ${pct(d.LGD, 1)} × ${usd(d.EAD_USD)} (EAD = monto solicitado)`;
+            $('#pdMeter').style.setProperty('--value', Math.max(0, Math.min(100, d.PD * 100)) + '%');
+            $('#percentileMeter').style.setProperty('--value', Math.max(0, Math.min(100, d.Percentil)) + '%');
+            const tag = { alto: ['RIESGO ALTO', 'var(--pink)'], medio: ['RIESGO MEDIO', 'var(--amber)'], bajo: ['RIESGO BAJO', 'var(--cyan)'] }[d.banda_riesgo];
+            $('#riskTag').textContent = tag[0]; $('#riskTag').style.color = tag[1];
+            $('.result-note').textContent = `Modelos guardados (PD: red neuronal temporal · LGD ${d.split_lgd}). Etiqueta de riesgo = tercil de puntaje en la población de entrenamiento. Equivalencia COP: ${FX.toLocaleString('es-CO')} COP/USD, solo informativa.`;
+            const ul = $('#avisos'); ul.replaceChildren();
+            (d.avisos || []).forEach(t => { const li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
+            const box = $('#defaultsBox'), omit = d.por_defecto || [];
+            box.style.display = omit.length ? '' : 'none';
+            $('#defaultsSummary').textContent = `${omit.length} dato(s) completados con el valor típico del entrenamiento`;
+            $('#defaultsList').textContent = omit.map(k => (CAMPOS.find(c => c.clave === k) || {}).etiqueta || k).join(', ');
+            dibujarPoblacion(d.Puntaje);
+            showStatus('API CONECTADA', 'var(--cyan)'); syncWi(false);
+        } catch (error) {
+            if (current !== requestNumber) return;
+            showStatus('ERROR', 'var(--pink)');
+            $('.result-note').textContent = `No se pudo calcular: ${error.message}. Si el servidor no responde, inícialo con "python -m app.api" desde la raíz del repositorio (${API_BASE_URL}).`;
+        }
+    }
+    function scheduleCompute() { actualizarEtiquetas(); clearTimeout(debounceHandle); debounceHandle = setTimeout(compute, 300); }
+
+    // ------------------------------------------------------------ qué pasaría si
+    function valorActual(c) { const d = leerDatos(); return d[c.clave] !== undefined ? d[c.clave] : c.defecto; }
+    function etiquetaValor(c, v) {
+        if (c.tipo === 'categoria') { const o = c.opciones.find(x => x.valor === v); return o ? o.etiqueta : v; }
+        return c.unidad === 'USD' ? usd(v) : fmtNum(v) + (c.unidad === '%' ? '%' : '');
+    }
+    function syncWi(reset) {
+        const wiVar = $('#wiVar'); const c = CAMPOS.find(x => x.clave === wiVar.value); if (!c) return;
+        const holder = $('#wiControl');
+        if (reset || holder.dataset.clave !== c.clave) {
+            holder.dataset.clave = c.clave; holder.replaceChildren(); let ctrl;
+            if (c.tipo === 'categoria') {
+                ctrl = document.createElement('select'); ctrl.className = 'selectbox';
+                c.opciones.forEach(op => { const o = document.createElement('option'); o.value = op.valor; o.textContent = op.etiqueta; ctrl.appendChild(o); });
+            } else {
+                ctrl = document.createElement('input'); ctrl.type = 'range';
+                const step = c.entero ? 1 : (STEP[c.clave] || (((c.p99 ?? 100) - (c.p01 ?? 0)) > 50 ? 1 : 0.1));
+                const lo = c.min === 0 ? 0 : Math.floor((c.p01 ?? 0) / step) * step;
+                const hi = Math.max(Math.ceil((c.p99 ?? c.defecto) / step) * step, lo + step);
+                ctrl.min = lo; ctrl.max = hi; ctrl.step = step;
+            }
+            ctrl.id = 'wiVal'; ctrl.addEventListener('input', () => { $('#wiOut').value = etiquetaValor(c, c.tipo === 'numero' ? Number(ctrl.value) : ctrl.value); clearTimeout(wiHandle); wiHandle = setTimeout(runWi, 300); });
+            holder.appendChild(ctrl);
+        }
+        const ctrl = $('#wiVal'), base = valorActual(c);
+        if (c.tipo === 'numero') { ctrl.min = Math.min(Number(ctrl.min), base); ctrl.max = Math.max(Number(ctrl.max), base); } // el rango siempre incluye el valor base
+        ctrl.value = base; $('#wiOut').value = etiquetaValor(c, base);
+        $('#wiResult').textContent = 'Mueve el control para comparar.'; $('#wiStatus').textContent = '—';
+    }
+    async function runWi() {
+        if (!lastBase) return;
+        const c = CAMPOS.find(x => x.clave === $('#wiVar').value), ctrl = $('#wiVal');
+        const value = c.tipo === 'numero' ? Number(ctrl.value) : ctrl.value;
+        $('#wiOut').value = etiquetaValor(c, value);
+        if (value === valorActual(c)) { $('#wiResult').textContent = 'Mueve el control para comparar.'; $('#wiStatus').textContent = '—'; return; }
+        const current = ++wiRequest; $('#wiStatus').textContent = 'CALCULANDO…';
+        try {
+            const d = await api('/escenario', { datos: leerDatos(), cambios: { [c.clave]: value } });
+            if (current !== wiRequest) return;
+            const rows = [
+                ['Puntaje', d.base.Puntaje.toFixed(1), d.escenario.Puntaje.toFixed(1), signed(d.cambio.Puntaje, 1, ' pts')],
+                ['PD', pct(d.base.PD, 2), pct(d.escenario.PD, 2), signed(d.cambio.PD * 100, 2, ' pp')],
+                ['Percentil', d.base.Percentil.toFixed(1), d.escenario.Percentil.toFixed(1), signed(d.cambio.Percentil, 1)],
+                ['LGD', pct(d.base.LGD, 1), pct(d.escenario.LGD, 1), signed(d.cambio.LGD * 100, 1, ' pp')],
+                ['Pérdida esperada', usd(d.base.Perdida_esperada_USD), usd(d.escenario.Perdida_esperada_USD),
+                    (d.cambio.Perdida_esperada_USD >= 0 ? '+' : '−') + usd(Math.abs(d.cambio.Perdida_esperada_USD))]
+            ];
+            const table = document.createElement('table'); table.style.cssText = 'width:100%;border-collapse:collapse;font-size:13px';
+            [['', 'Base', 'Escenario', 'Cambio'], ...rows].forEach((r, i) => {
+                const tr = document.createElement('tr');
+                r.forEach((x, j) => { const td = document.createElement(i ? 'td' : 'th'); td.textContent = x; td.style.cssText = 'padding:5px 6px;border-bottom:1px solid var(--line, #385347);text-align:' + (j ? 'right' : 'left'); tr.appendChild(td); });
+                table.appendChild(tr);
+            });
+            $('#wiResult').replaceChildren(table); $('#wiStatus').textContent = 'LISTO';
+        } catch (error) { if (current === wiRequest) { $('#wiStatus').textContent = 'ERROR'; $('#wiResult').textContent = error.message; } }
+    }
+
+    // ------------------------------------------------------------ métricas, enlaces y figuras reales
+    async function loadMetrics() {
+        try {
+            const d = await api('/metricas'), lg = d.modelos.logreg || {}, ml = d.modelos.mlp || {};
+            const f3 = x => (x === null || x === undefined) ? 'n/d' : Number(x).toFixed(3);
+            $('#mAucLog').textContent = f3(lg.auc); $('#mAucMlp').textContent = f3(ml.auc);
+            $('#mKsMlp').textContent = f3(ml.ks); $('#mBrierMlp').textContent = f3(ml.brier);
+            $('#metricNote').textContent = `Partición: ${d.particion}. Semillas en prueba: logística ${lg.n_semillas_test ?? 'n/d'}, red ${ml.n_semillas_test ?? 'n/d'}; la red tiene ${ml.n_semillas_val ?? 'n/d'} semillas en validación (desviación del AUC ${f3(ml.auc_val_sd)}). Parámetros entrenables: logística ${lg.parametros ?? 'n/d'}, red ${ml.parametros ?? 'n/d'}. Fuente: ${d.fuente.join(', ')}.`;
+        } catch (e) { $('#metricNote').textContent = 'No se pudieron cargar las métricas: ' + e.message; }
+    }
+    async function loadConfig() {
+        try {
+            const c = await api('/config'); FX = Number(c.tasa_COP_USD) || FX;
+            [['#lnkRepo', c.repo_url], ['#lnkReport', c.report_url], ['#lnkVideo', c.video_url]].forEach(([sel, url]) => {
+                const a = $(sel);
+                if (url) { a.href = url; a.target = '_blank'; a.rel = 'noopener'; }
+                else { a.removeAttribute('href'); a.style.opacity = .45; a.textContent = a.textContent.replace(' ↗', '') + ' (PENDIENTE)'; }
+            });
+            if (c.scorecard) $('#scoreSmall').textContent = `Base ${c.scorecard.puntaje_base} con odds ${c.scorecard.odds_base}:1 · PDO ${c.scorecard.pdo} · mayor puntaje, menor riesgo`;
+        } catch (e) { /* los enlaces quedan sin configurar */ }
+    }
+    const figImg = $('#figImg');
+    function showFigure(tab) {
+        document.querySelectorAll('.tab').forEach(x => x.classList.remove('active')); tab.classList.add('active');
+        $('#chartType').textContent = tab.dataset.title;
+        figImg.src = `${API_BASE_URL}/figuras/${tab.dataset.fig}`;
+        figImg.alt = `Figura: ${tab.dataset.title} (${tab.dataset.fig})`;
+    }
+    figImg.addEventListener('error', () => { $('#figNote').textContent = 'No se encontró la figura; genérala con: python -m src.experiments.make_figures'; });
+    figImg.addEventListener('load', () => { $('#figNote').textContent = `Archivo: results/figures/${figImg.src.split('/').pop()}. Su numeración y fuente aparecen en el reporte técnico.`; });
+    document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => showFigure(b)));
+    showFigure(document.querySelector('.tab.active'));
+
+    // ------------------------------------------------------------ arranque
+    async function init() {
+        await loadConfig(); loadMetrics();
+        try {
+            const [esq, pob] = await Promise.all([api('/esquema'), api('/poblacion')]);
+            CAMPOS = esq.campos; POB = pob;
+        } catch (e) {
+            showStatus('SIN CONEXIÓN', 'var(--pink)');
+            $('.result-note').textContent = `No se pudo leer el esquema de la API en ${API_BASE_URL}. Inicia el servidor con "python -m app.api" desde la raíz del repositorio. Detalle: ${e.message}`;
+            return;
+        }
+        const basico = $('#formBasico'), avanzado = $('#formAvanzado'); let grupoActual = {};
+        CAMPOS.forEach(c => {
+            const cont = c.nivel === 'basico' ? basico : avanzado, key = c.nivel + c.grupo;
+            if (!grupoActual[key]) { const h = document.createElement('div'); h.className = 'group-title'; h.textContent = c.grupo; cont.appendChild(h); grupoActual[key] = true; }
+            cont.appendChild(crearCampo(c));
+        });
+        const wiVar = $('#wiVar');
+        CAMPOS.forEach(c => { const o = document.createElement('option'); o.value = c.clave; o.textContent = c.etiqueta; wiVar.appendChild(o); });
+        wiVar.value = 'dti'; wiVar.addEventListener('change', () => syncWi(true));
+        $('#reset').addEventListener('click', () => { fijarValores(valoresIniciales()); compute(); });
+        $('#randomize').addEventListener('click', () => {
+            const v = {};
+            CAMPOS.filter(c => c.nivel === 'basico').forEach(c => {
+                if (c.tipo === 'categoria') v[c.clave] = c.opciones[Math.floor(Math.random() * c.opciones.length)].valor;
+                else { const [lo, hi, st] = BASICO_SLIDER.has(c.clave) ? sliderRange(c) : [c.p01 ?? 0, c.p99 ?? c.defecto, 1]; v[c.clave] = Math.round((lo + Math.random() * (hi - lo)) / st) * st; }
+            });
+            fijarValores(v); compute();
+        });
+        syncWi(true); window.addEventListener('resize', () => lastBase && dibujarPoblacion(lastBase.Puntaje)); compute();
+    }
+    init();
+</script>
+
     
 </body>
 

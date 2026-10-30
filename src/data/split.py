@@ -65,7 +65,7 @@ def random_split(
     train_size: float = 0.70,
     val_size: float = 0.15,
     test_size: float = 0.15,
-    random_state: int = 42
+    random_state: int = 90
 ) -> Dict[str, pd.DataFrame]:
     """
     Realiza una partición aleatoria estratificada (70% Train, 15% Val, 15% Test)

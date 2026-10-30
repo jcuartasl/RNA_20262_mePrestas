@@ -3,7 +3,7 @@
 Ejecutar desde la raíz del repositorio:   streamlit run app/app.py
 Usa EXACTAMENTE el mismo servicio que la API (app/servicio.py): mismos campos, validaciones y modelos guardados.
 No reentrena. Variables opcionales: ME_PRESTAS_LGD_SEED (90), ME_PRESTAS_LGD_SCHEME (temporal),
-ME_PRESTAS_COP_PER_USD (4000, solo informativa), ME_PRESTAS_REPORT_URL, ME_PRESTAS_VIDEO_URL, ME_PRESTAS_REPO_URL.
+ME_PRESTAS_COP_PER_USD (3140, solo informativa), ME_PRESTAS_REPORT_URL, ME_PRESTAS_VIDEO_URL, ME_PRESTAS_REPO_URL.
 """
 from __future__ import annotations
 

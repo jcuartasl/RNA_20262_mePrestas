@@ -21,7 +21,7 @@ def run_pd_ablations(
         "activation": "tanh",
         "dropout": 0.2,
         "lr": 0.003,
-        "seed": 42,
+        "seed": 90,
         "epochs": 60,
         "batch_size": 64,
         "patience": 10,

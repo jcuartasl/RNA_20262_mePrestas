@@ -251,11 +251,13 @@ def fase_diagnostico(base, datos, n_seeds=5):
     fig.savefig(FIGURAS / "lgd_calibracion_deciles.png", dpi=300)
     plt.close(fig)
 
-    # misma configuración ganadora pero con relu, que no está acotada: si el techo costara algo, bajaría el rmse
-    cfg_relu = copy.deepcopy(base)
+    # misma fila ganadora pero con relu, que no está acotada: si el techo costara algo, bajaría el rmse
+    # se arma desde la fila y no desde base para que la única diferencia con la tanh guardada sea la activación
+    fila = mejor_por_perdida(pd.read_csv(TABLAS / "lgd_busqueda.csv")).iloc[0]
+    cfg_relu = config_de_fila(base, fila)
     cfg_relu["model"]["activation"] = "relu"
     relu, _ = semillas_de_config(datos, cfg_relu, semillas[:n_seeds], experimento="lgd_mlp_relu")
-    tanh = pd.read_csv(TABLAS / f"lgd_semillas_{base['loss']['name']}.csv").head(n_seeds)
+    tanh = pd.read_csv(TABLAS / f"lgd_semillas_{fila['perdida']}.csv").head(n_seeds)
     comparacion = pd.DataFrame({"semilla": relu["semilla"], "rmse_tanh": tanh["rmse"].to_numpy(),
                                 "rmse_relu": relu["rmse"].to_numpy()})
     comparacion.to_csv(TABLAS / "lgd_techo_relu.csv", index=False)

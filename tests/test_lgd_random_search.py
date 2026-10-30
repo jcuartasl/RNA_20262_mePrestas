@@ -1,6 +1,8 @@
 """Pruebas de src/search/lgd_random_search.py con datos sintéticos y pocas épocas."""
 import numpy as np
 import pandas as pd
+import pytest
+import torch
 
 from src.models.lgd_mlp import entrenar_lgd_mlp, predecir_lgd
 from src.search.lgd_random_search import (PERDIDAS, buscar_lgd, calibracion_por_decil, config_de_fila,
@@ -76,15 +78,20 @@ def test_techo_tanh_acota_las_predicciones():
     d = datos()
     cfg = configurar(BASE, {"hidden": [16], "activation": "tanh", "dropout": 0.0, "lr": 1e-2, "l2": 0.0}, "bce")
     modelo, _, _ = entrenar_lgd_mlp(d["X_train"], d["y_train"], d["X_val"], d["y_val"], cfg)
+    salida = modelo.network[-1]
+    with torch.no_grad(): salida.weight.fill_(0.1), salida.bias.fill_(-0.2)
+    # valor esperado calculado a mano: sigmoide(-0.2 + 16 * 0.1), lejos de 1 para que la cota no sea trivial
+    assert techo_tanh(modelo) == pytest.approx(1 / (1 + np.exp(-1.4)), abs=1e-6)
     X_extremo = np.vstack([d["X_val"], 100 * d["X_val"]])     # entradas absurdas para empujar al techo
     assert predecir_lgd(modelo, X_extremo).max() <= techo_tanh(modelo) + 1e-6
 
 
 def test_calibracion_por_decil():
     p = np.linspace(0, 1, 100)
-    tabla = calibracion_por_decil(p, p)
+    tabla = calibracion_por_decil(1 - p, p)                   # y distinto de p: obliga a usar y
     assert len(tabla) == 10 and (tabla["n"] == 10).all()
-    np.testing.assert_allclose(tabla["media_pred"], tabla["media_obs"])
+    np.testing.assert_allclose(tabla["media_obs"], 1 - tabla["media_pred"])
+    assert tabla["media_obs"].iloc[0] == pytest.approx(1 - 4.5 / 99)
 
 
 def test_semillas_de_config_usa_el_nombre_de_experimento_dado(tmp_path):

@@ -1,5 +1,5 @@
 # configuración final elegida por src/search/lgd_random_search.py
-# menor rmse en validación aleatoria: 0.18113 (r2 = 0.2133)
+# menor rmse en validación aleatoria: 0.17735 (r2 = 0.2303)
 # tabla completa en results/tables/lgd_busqueda.csv
 data: {scheme: random}
 train: {lr: 0.003, epochs: 100, batch_size: 256, patience: 10, l1: 0.0, l2: 1.0e-05}
@@ -7,4 +7,4 @@ model:
   hidden: [128, 64, 32]
   dropout: 0.1
   activation: tanh
-loss: {name: bce, eps: 0.0001}
+loss: {name: mse, eps: 0.0001}

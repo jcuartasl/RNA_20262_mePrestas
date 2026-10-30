@@ -1,182 +1,168 @@
-"""Streamlit app for the ¿Me prestas? credit-risk prototype.
+"""Interfaz Streamlit de ¿Me prestas? (alternativa a index.html + API).
 
-Copy to app/app.py in the repository and run from the repository root:
-    streamlit run app/app.py
-Loads saved models; it does not re-train them.
+Ejecutar desde la raíz del repositorio:   streamlit run app/app.py
+Usa EXACTAMENTE el mismo servicio que la API (app/servicio.py): mismos campos, validaciones y modelos guardados.
+No reentrena. Variables opcionales: ME_PRESTAS_LGD_SEED (90), ME_PRESTAS_LGD_SCHEME (temporal),
+ME_PRESTAS_COP_PER_USD (4000, solo informativa), ME_PRESTAS_REPORT_URL, ME_PRESTAS_VIDEO_URL, ME_PRESTAS_REPO_URL.
 """
 from __future__ import annotations
+
 import os
-from typing import Any
-import numpy as np
-import streamlit as st
-import yaml
 import sys
 from pathlib import Path
-from src.models.lgd_mlp import cargar_lgd_mlp, predecir_lgd
-from src.scorecard.api import ScorecardAPI
-from src.utils.config import ROOT
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import streamlit as st
+
+ROOT_LOCAL = Path(__file__).resolve().parents[1]
+if str(ROOT_LOCAL) not in sys.path:
+    sys.path.insert(0, str(ROOT_LOCAL))
+
+from app.servicio import obtener_servicio  # noqa: E402
 
 st.set_page_config(page_title="¿Me prestas? · Riesgo de crédito", page_icon="📊", layout="wide")
+FX = float(os.environ.get("ME_PRESTAS_COP_PER_USD", "4000"))
+
 
 @st.cache_resource(show_spinner="Cargando modelos guardados…")
-def cargar_recursos():
-    api = ScorecardAPI.cargar()
-    with (ROOT / "configs" / "lgd_mlp.yaml").open(encoding="utf-8") as f:
-        cfg = yaml.safe_load(f) or {}
-    seed = int(os.environ.get("ME_PRESTAS_LGD_SEED"))
-    scheme = cfg.get("data", {}).get("scheme", "random")
-    suffix = "" if scheme == "random" else f"_{scheme}"
-    model_path = ROOT / "models" / f"lgd_mlp{suffix}_seed{seed}.pt"
-    if not model_path.exists():
-        raise FileNotFoundError(f"No existe el modelo LGD: {model_path.relative_to(ROOT)}")
-    lgd_model, _, loss_name = cargar_lgd_mlp(model_path)
-    return api, lgd_model, loss_name, model_path, scheme
+def recursos():
+    return obtener_servicio()
 
 
-def detalles_preprocesador(api):
-    numeric, initial = [], {}
-    for name, transformer, columns in api.preprocesador.transformers_:
-        if name == "remainder" or not isinstance(columns, (list, tuple, np.ndarray)):
-            continue
-        columns = list(columns)
-        imputer = transformer.named_steps.get("imputer") if hasattr(transformer, "named_steps") else None
-        if name == "num":
-            numeric.extend(columns)
-            if imputer is not None:
-                initial.update({c: float(v) for c, v in zip(columns, imputer.statistics_)})
-        elif name == "cat" and imputer is not None:
-            initial.update({c: str(v) for c, v in zip(columns, imputer.statistics_)})
-    return numeric, initial
+def usd(x):
+    return f"US${x:,.0f}"
 
 
-def agrupar(columns):
-    groups = {"Solicitud y monto": [], "Ingresos y empleo": [], "Historial de crédito": [], "Otros datos": []}
-    patterns = {
-        "Solicitud y monto": ("loan_amnt", "funded_amnt", "funded_amnt_inv", "term", "purpose"),
-        "Ingresos y empleo": ("annual_inc", "emp_length", "home_ownership", "verification_status"),
-        "Historial de crédito": ("delinq", "inq_", "open_acc", "pub_rec", "revol", "total_acc", "earliest_cr_line", "collections", "acc_", "mortgage", "bankcard", "num_", "tax_liens", "months_since"),
-    }
-    for col in columns:
-        group = next((g for g, keys in patterns.items() if any(k in col.lower() for k in keys)), "Otros datos")
-        groups[group].append(col)
-    return {g: cols for g, cols in groups.items() if cols}
+def widget(campo, clave_ui, opcional):
+    """Dibuja el control de un campo del esquema y devuelve su valor (None si se deja vacío)."""
+    etiqueta = campo["etiqueta"] + (f" ({campo['unidad']})" if campo["unidad"] not in ("", "n") else "")
+    ayuda = campo["ayuda"] + (f"\n\nDiccionario oficial: {campo['diccionario']}" if campo.get("diccionario") else "")
+    if campo["tipo"] == "categoria":
+        valores = [o["valor"] for o in campo["opciones"]]
+        nombres = {o["valor"]: o["etiqueta"] for o in campo["opciones"]}
+        if opcional:
+            valores = [None] + valores
+            nombres[None] = "— valor típico —"
+            idx = 0
+        else:
+            idx = valores.index(campo["defecto"]) if campo["defecto"] in valores else 0
+        return st.selectbox(etiqueta, valores, index=idx, format_func=lambda v: nombres[v], help=ayuda, key=clave_ui)
+    paso = 1.0 if campo["entero"] else 0.1
+    lo = campo["min"] if campo["min"] is not None else 0.0
+    if opcional:
+        txt = st.text_input(etiqueta, value="", placeholder=f"típico: {campo['defecto']:,.4g}", help=ayuda, key=clave_ui)
+        if txt.strip() == "":
+            return None
+        try:
+            return float(txt.replace(",", "."))
+        except ValueError:
+            st.error(f"{campo['etiqueta']}: escribe un número.")
+            return None
+    return st.number_input(etiqueta, min_value=float(lo), max_value=float(campo["max"]) if campo["max"] is not None else None,
+                           value=float(round(campo["defecto"], 2)), step=1000.0 if campo["unidad"] == "USD" else paso, help=ayuda, key=clave_ui)
 
 
-def widget(col, numeric, initial, categories, key):
-    label = col.replace("_", " ").capitalize()
-    if numeric:
-        value = float(initial.get(col, 0.0))
-        return st.number_input(label, value=value, step=1.0 if value.is_integer() else 0.1, key=key,
-                               help=f"Valor inicial: mediana del entrenamiento ({value:,.3g}).")
-    options = categories.get(col, [])
-    if not options:
-        return st.text_input(label, value=str(initial.get(col, "")), key=key)
-    default = str(initial.get(col, options[0]))
-    return st.selectbox(label, options, index=options.index(default) if default in options else 0, key=key)
-
-
-def predict(api, lgd_model, features: dict[str, Any], ead: float):
-    X = api.preprocesar(features)
-    score, pd_value = api.score(X)
-    lgd = float(predecir_lgd(lgd_model, X)[0])
-    pd_value, score = float(pd_value[0]), float(score[0])
-    return {"PD": pd_value, "Puntaje": score, "Percentil": float(api.percentile([score])[0]),
-            "LGD": lgd, "EAD": float(ead), "E[L]": pd_value * lgd * float(ead)}
-
-
-def show_metrics(result, title):
-    st.subheader(title)
+def mostrar(r, titulo):
+    st.subheader(titulo)
     cols = st.columns(5)
-    for col, label, value in zip(cols, ("PD", "Puntaje", "Percentil", "LGD", "Pérdida esperada"),
-                                 (f"{result['PD']:.1%}", f"{result['Puntaje']:.1f}", f"{result['Percentil']:.1f}",
-                                  f"{result['LGD']:.1%}", f"${result['E[L]']:,.2f}")):
-        col.metric(label, value)
-    st.caption(f"E[L] = PD × LGD × EAD = {result['PD']:.4f} × {result['LGD']:.4f} × ${result['EAD']:,.2f}.")
+    for col, (e, v) in zip(cols, (("PD", f"{r['PD']:.2%}"), ("Puntaje", f"{r['Puntaje']:.1f}"), ("Percentil", f"{r['Percentil']:.1f}"),
+                                  ("LGD", f"{r['LGD']:.1%}"), ("Pérdida esperada", usd(r["Perdida_esperada_USD"])))):
+        col.metric(e, v)
+    st.caption(f"E[L] = PD × LGD × EAD = {r['PD']:.4f} × {r['LGD']:.4f} × {usd(r['EAD_USD'])} "
+               f"(≈ ${r['Perdida_esperada_USD'] * FX:,.0f} COP a {FX:,.0f} COP/USD, solo informativo). Riesgo {r['banda_riesgo']} (tercil de puntaje en el entrenamiento).")
+    for a in r["avisos"]:
+        st.warning(a)
 
 
 def main():
     st.title("¿Me prestas?")
-    st.write("Explora una estimación de riesgo crediticio con los modelos guardados del proyecto.")
-    st.info("Prototipo académico; no constituye una decisión real de crédito. Consulta el reporte para conocer la definición de LGD y las limitaciones temporales del modelo.")
+    st.write("Estimación de riesgo de crédito con los modelos guardados del proyecto (pre-aprobación: datos disponibles antes del desembolso).")
+    st.info("Prototipo académico con datos de Lending Club (EE. UU., 2007–2015) en dólares; no es una decisión real de crédito.")
     try:
-        api, lgd_model, loss_name, lgd_path, scheme = cargar_recursos()
+        s = recursos()
     except Exception as exc:
         st.error(f"No se pudieron cargar los artefactos del proyecto: {exc}")
         st.stop()
+    sc = s.sc.scorecard
+    st.caption(f"Scorecard: base {sc.puntaje_base:g}, odds {sc.odds_base:g}:1, PDO {sc.pdo:g}. LGD: {s.perdida_lgd}, split {s.esquema_lgd}, `{s.ruta_lgd}`.")
+    if s.aviso_lgd:
+        st.warning(s.aviso_lgd)
 
-    numeric, initial = detalles_preprocesador(api)
-    categories = api.categorias()
-    features_required = api.variables_requeridas
-    st.caption(f"Scorecard: base {api.scorecard.puntaje_base:g}, PDO {api.scorecard.pdo:g}. LGD: {loss_name}, split {scheme}, `{lgd_path.relative_to(ROOT)}`.")
-
-    with st.form("credit_case"):
-        st.subheader("Características del solicitante y del crédito")
-        st.caption("Los valores iniciales corresponden a medianas/modas del entrenamiento; ajústalos al escenario que quieras estimar.")
-        ead_default = max(1.0, float(initial.get("funded_amnt", 10000.0)))
-        ead = st.number_input("EAD / monto financiado (USD)", min_value=0.01, value=ead_default, step=100.0)
-        features = {}
-        for title, fields in agrupar(features_required).items():
-            with st.expander(title, expanded=(title == "Solicitud y monto")):
+    with st.form("solicitud"):
+        st.subheader("Datos del solicitante y del crédito (USD)")
+        datos: dict = {}
+        grupos = sorted({c["grupo"] for c in s.campos}, key=lambda g: [c["grupo"] for c in s.campos].index(g))
+        for g in grupos:
+            basicos = [c for c in s.campos if c["grupo"] == g and c["nivel"] == "basico"]
+            if basicos:
+                st.markdown(f"**{g}**")
                 cols = st.columns(2)
-                for i, field in enumerate(fields):
+                for i, c in enumerate(basicos):
                     with cols[i % 2]:
-                        features[field] = widget(field, field in numeric, initial, categories, f"base_{field}")
-        submitted = st.form_submit_button("Calcular estimación", type="primary", use_container_width=True)
+                        datos[c["clave"]] = widget(c, f"f_{c['clave']}", opcional=False)
+        with st.expander("Datos avanzados de buró y perfil (opcionales)"):
+            st.caption("Si los dejas vacíos se usa la mediana o moda del entrenamiento; el resultado indica cuáles fueron.")
+            cols = st.columns(2)
+            for i, c in enumerate([c for c in s.campos if c["nivel"] == "avanzado"]):
+                with cols[i % 2]:
+                    datos[c["clave"]] = widget(c, f"f_{c['clave']}", opcional=True)
+        enviado = st.form_submit_button("Calcular estimación", type="primary")
 
-    if submitted:
-        # En la definición adoptada por el proyecto EAD = funded_amnt al originar.
-        if "funded_amnt" in features:
-            features["funded_amnt"] = float(ead)
+    if enviado:
+        limpio = {k: v for k, v in datos.items() if v is not None}
         try:
-            st.session_state["base_features"] = features
-            st.session_state["base_ead"] = float(ead)
-            st.session_state["base_result"] = predict(api, lgd_model, features, float(ead))
+            st.session_state["datos"] = limpio
+            st.session_state["base"] = s.calcular(limpio)
+        except ValueError as exc:
+            st.error(str(exc))
         except Exception as exc:
-            st.error(f"No se pudo calcular el caso; revisa los datos ingresados. Detalle: {exc}")
+            st.error(f"No se pudo calcular el caso. Detalle: {exc}")
 
-    base = st.session_state.get("base_result")
-    base_features = st.session_state.get("base_features")
-    if base and base_features:
-        show_metrics(base, "Estimación del caso base")
+    base, datos_base = st.session_state.get("base"), st.session_state.get("datos")
+    if base:
+        mostrar(base, "Estimación del caso base")
+        if base["por_defecto"]:
+            with st.expander(f"{len(base['por_defecto'])} dato(s) completados con el valor típico del entrenamiento"):
+                st.write(", ".join(s.por_clave[k]["etiqueta"] for k in base["por_defecto"]))
+        hist = s.histograma()
+        import pandas as pd
+        centros = [(a + b) / 2 for a, b in zip(hist["bordes"][:-1], hist["bordes"][1:])]
+        st.caption(f"Distribución de puntajes de la población de entrenamiento (n = {hist['n']:,}); tu puntaje: {base['Puntaje']:.1f}.")
+        st.bar_chart(pd.DataFrame({"personas": hist["cuentas"]}, index=[round(c) for c in centros]))
+
         st.divider()
         st.subheader("¿Qué pasaría si cambias una característica?")
-        candidates = [c for c in features_required if c != "funded_amnt"]
-        if candidates:
-            variable = st.selectbox("Característica", candidates, key="scenario_variable")
-            if variable in numeric:
-                current = float(base_features[variable])
-                changed_value = st.number_input(f"Nuevo valor de {variable.replace('_', ' ')}", value=current,
-                                                step=1.0 if current.is_integer() else 0.1, key="scenario_numeric")
-            else:
-                options = categories.get(variable, [])
-                current = str(base_features[variable])
-                index = options.index(current) if current in options else 0
-                changed_value = st.selectbox(f"Nuevo valor de {variable.replace('_', ' ')}", options or [current],
-                                              index=index, key="scenario_category")
-            if st.button("Comparar escenario"):
-                scenario = {**base_features, variable: changed_value}
-                try:
-                    alternative = predict(api, lgd_model, scenario, st.session_state["base_ead"])
-                    left, right = st.columns(2)
-                    with left:
-                        show_metrics(base, "Caso base")
-                    with right:
-                        show_metrics(alternative, "Escenario modificado")
-                    st.write(f"Cambio de puntaje: **{alternative['Puntaje'] - base['Puntaje']:+.1f}** · "
-                             f"Cambio de PD: **{alternative['PD'] - base['PD']:+.1%}** · "
-                             f"Cambio de pérdida esperada: **${alternative['E[L]'] - base['E[L]']:+,.2f}**")
-                except Exception as exc:
-                    st.error(f"No se pudo calcular el escenario: {exc}")
+        claves = [c["clave"] for c in s.campos]
+        clave = st.selectbox("Característica", claves, format_func=lambda k: s.por_clave[k]["etiqueta"], key="wi_var")
+        campo = s.por_clave[clave]
+        actual = datos_base.get(clave, campo["defecto"])
+        if campo["tipo"] == "categoria":
+            valores = [o["valor"] for o in campo["opciones"]]
+            nombres = {o["valor"]: o["etiqueta"] for o in campo["opciones"]}
+            nuevo = st.selectbox("Nuevo valor", valores, index=valores.index(actual) if actual in valores else 0,
+                                 format_func=lambda v: nombres[v], key=f"wi_{clave}")
+        else:
+            nuevo = st.number_input("Nuevo valor", value=float(actual), step=1.0 if campo["entero"] else 0.1, key=f"wi_{clave}")
+        if st.button("Comparar escenario"):
+            try:
+                e = s.escenario(datos_base, {clave: nuevo})
+                izq, der = st.columns(2)
+                with izq:
+                    mostrar(e["base"], "Caso base")
+                with der:
+                    mostrar(e["escenario"], "Escenario modificado")
+                c = e["cambio"]
+                st.write(f"Cambio de puntaje: **{c['Puntaje']:+.1f}** · PD: **{c['PD']:+.2%}** · "
+                         f"percentil: **{c['Percentil']:+.1f}** · pérdida esperada: **{c['Perdida_esperada_USD']:+,.0f} USD**")
+            except ValueError as exc:
+                st.error(str(exc))
 
-    links = []
-    for label, env_name in (("Reporte técnico", "ME_PRESTAS_REPORT_URL"), ("Video promocional", "ME_PRESTAS_VIDEO_URL")):
-        url = os.environ.get(env_name, "").strip()
-        if url:
-            links.append(f"[{label}]({url})")
     st.divider()
-    st.markdown(" · ".join(links) if links else "Configura `ME_PRESTAS_REPORT_URL` y `ME_PRESTAS_VIDEO_URL` para mostrar los enlaces finales.")
+    partes = []
+    for etiqueta, env in (("Reporte técnico", "ME_PRESTAS_REPORT_URL"), ("Video promocional", "ME_PRESTAS_VIDEO_URL"),
+                          ("Repositorio", "ME_PRESTAS_REPO_URL")):
+        url = os.environ.get(env, "").strip()
+        partes.append(f"[{etiqueta}]({url})" if url else f"{etiqueta}: pendiente de publicar")
+    st.markdown(" · ".join(partes))
 
 
 if __name__ == "__main__":

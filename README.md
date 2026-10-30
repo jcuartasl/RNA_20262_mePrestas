@@ -49,12 +49,24 @@ pip install -r requirements.txt
 | Pérdida esperada | `python -m src.experiments.expected_loss --config configs/el.yaml` |
 | Figuras | `python -m src.experiments.make_figures` |
 | Demo (< 2 min) | `python -m src.experiments.demo` |
-| App web | `streamlit run app/app.py` |
+| App web (principal) | `python -m app.api` → http://127.0.0.1:8000 |
+| App web (alternativa) | `streamlit run app/app.py` |
 
 ### Cambiar parámetros sin editar código
 ```bash
 python -m src.experiments.train_pd --config configs/pd_mlp.yaml --override train.lr=0.001 model.hidden=[64,32] model.dropout=0.2
 ```
+
+## Aplicación web: qué datos pide y por qué
+- El formulario se construye desde los modelos guardados (`GET /esquema`, módulo `app/servicio.py`): 21 variables que el
+  preprocesador exige y que un solicitante puede declarar o consultar en buró **antes del desembolso** (caso de uso de pre-aprobación).
+- Unidad: **USD**, la de entrenamiento (Lending Club 2007-2015). El equivalente en COP es solo informativo
+  (`ME_PRESTAS_COP_PER_USD`, por defecto 4000).
+- Fijas (no se preguntan): `funded_amnt = funded_amnt_inv = loan_amnt` (= EAD), `policy_code = 1`, `pymnt_plan = n`,
+  `application_type = INDIVIDUAL`, `initial_list_status` (moda) y `earliest_cr_line` (en `preprocessor.pkl` todas sus categorías
+  quedaron como «infrecuentes», por lo que no afecta ninguna predicción).
+- Campos opcionales vacíos se completan con mediana/moda del entrenamiento y la respuesta los lista (`por_defecto`).
+- Prueba de coherencia: `pytest tests/test_servicio.py`.
 
 ## Semillas y reproducibilidad
 - Semilla global: 90 (en `configs/default.yaml`).

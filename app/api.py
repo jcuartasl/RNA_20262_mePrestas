@@ -121,7 +121,7 @@ def config():
     out: dict[str, Any] = {
         "repo_url": os.getenv("ME_PRESTAS_REPO_URL", "https://github.com/jcuartasl/RNA_20262_mePrestas").strip(),
         "report_url": os.getenv("ME_PRESTAS_REPORT_URL", "").strip(),
-        "video_url": os.getenv("ME_PRESTAS_VIDEO_URL", "https://youtu.be/Li35oMpmqmk").strip(),
+        "video_url": os.getenv("ME_PRESTAS_VIDEO_URL", "https://youtu.be/5m5lGOBUuW0").strip(),
         "tasa_COP_USD": _fx(),
         "moneda_modelo": "USD",
     }

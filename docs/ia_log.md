@@ -13,8 +13,8 @@ en ese momento.
 - **Categoría:** matemáticas / conceptos (optimizador y regularización)
 - **IA:** Claude (Claude Code, Opus 5.5) · **fecha:** 2026-10-24
 - **1. Prompt (literal):**
-  > bien, parece que mis compañeros ya hicieron varios merge a develop, quieres verlo para que sepas
-  > en que avance va el grupo?
+  > bien, parece que mis compañeros ya hicieron varios merge a develop, antes de generar un conflicto
+  > puedes resumirme los comits y que avanzaron?
 - **2. Respuesta de la IA (parte relevante, literal):**
   > 7. **L2 implementada como `weight_decay` dentro de Adam.** Con Adam eso no equivale exactamente a
   > sumar λ‖w‖² a la pérdida; esa es la diferencia entre Adam y AdamW. Es un buen punto para tu
@@ -47,37 +47,18 @@ en ese momento.
 
 - **Categoría:** conceptos
 - **IA:** Claude (Claude Code, Opus 5.5) · **fecha:** 2026-10-24
-- **1. Prompt (literal; entre corchetes, los nombres internos de los roles del equipo):**
-  > Antes de escribir código, quiero confirmar que entendiste mi rol y acordar un plan.
-  >
-  > PARTE A. Confirmación de comprensión (con tus palabras, no copies la guía)
-  > Soy [mi rol] (Optimización, regularización y pérdidas). Explícame:
-  > 1. Qué tengo que entregar en la Parte 1 (PD) y en la Parte 2 (LGD).
+- **1. Prompt (literal):**
+  > PARTE A. Confirmación de comprensión (con tus palabras, no copies la guía). Explícame:
+  > 1. Qué tengo que entregar en  (PD) y en  (LGD).
   > 2. Qué artefactos son míos (módulos, configs, secciones del reporte, modelos exportados) y cuáles solo reviso o consumo.
-  > 3. Qué contratos de la sección 7 de la guía me involucran (por ejemplo get_loss(name), build_mlp(cfg), load_splits, metrics.*) y quién produce o consume cada uno.
-  > 4. Qué me toca en cada fase (0 a 10) y qué parte de la cacería de la alucinación y del video individual es mía.
-  > 5. A quién reviso en el anillo y quién me revisa a mí.
-  > Si algo de la guía es ambiguo o contradictorio, dímelo en vez de asumir.
-  >
-  > PARTE B. Estado real del repo
-  > Con base en lo que ya leíste (estructura, git log, ramas remotas, src/), dime qué existe y qué falta de lo que yo necesito de [los demás integrantes]. Marca cada dependencia como "disponible", "parcial" o "bloqueada".
-  >
-  > PARTE C. Plan de trabajo para terminar mi parte con éxito
-  > Propón un plan por etapas, en orden, donde cada etapa indique:
-  > - Qué hago y qué archivos toca.
-  > - De qué depende (y si puedo avanzar con datos sintéticos mientras espero).
-  > - Cómo verifico que quedó bien (pruebas, verificación de gradientes contra autograd y diferencias finitas, comparación contra una implementación de referencia).
+  > 3. Qué contratos de la sección 7 de la guía me involucran.
   >
   >
-  > PARTE D. Decisiones abiertas
-  > Lista las decisiones técnicas que debo tomar o acordar con el equipo antes de avanzar (framework, política de semillas, tratamiento de 0 y 1 en la Beta, pérdida candidata para LGD, presupuesto de búsqueda, etc.). Para cada una, da las opciones con sus pros y contras y tu recomendación, pero no decidas por mí.
+  > PARTE B. Plan de trabajo para terminar mi parte con éxito Propón un plan por etapas, en orden, donde cada etapa indique: - Qué hago y qué archivos toca. - De qué depende (y si puedo avanzar con datos sintéticos mientras espero). - Cómo verifico que quedó bien (pruebas, verificación de gradientes contra autograd y diferencias finitas, comparación contra una implementación de referencia).
   >
-  > Reglas para esta conversación:
-  > - No escribas ni modifiques archivos todavía. Solo responde.
-  > - Explícame el porqué de cada paso, porque tengo que poder defender y explicar mi parte en la sustentación.
-  > - Cuando empecemos a implementar, quiero ir paso a paso, una etapa por vez, y que me expliques cada decisión antes de aplicarla.
-  > - No cites referencias bibliográficas de memoria; si hace falta una, márcala como "por verificar".
-  > .no hacer comit sin mi permiso y me dices en que momento es recomendable hacerlo y tamvien dime como deberia capturar alucinaciones?
+  > PARTE D. Decisiones abiertas Lista las decisiones técnicas que debo tomar o acordar con el equipo antes de avanzar (framework, política de semillas, tratamiento de 0 y 1 en la Beta, pérdida candidata para LGD, presupuesto de búsqueda, etc.). Para cada una, da las opciones con sus pros y contras y tu recomendación, pero no decidas por mí.
+  >
+  > Reglas  - Explícame el porqué de cada paso, porque tengo que poder defender y explicar mi parte en la sustentación. - Cuando empecemos a implementar, quiero ir paso a paso, una etapa por vez, y que me expliques cada decisión antes de aplicarla. - No cites referencias bibliográficas de memoria
 - **2. Respuesta de la IA (parte relevante, literal):**
   > **MSE**: simple y coincide con la métrica RMSE, pero supone ruido gaussiano y tiende a encoger las
   > predicciones hacia la media.
@@ -100,7 +81,7 @@ en ese momento.
 - **Categoría:** conceptos (varianza condicional frente a marginal)
 - **IA:** Claude (Claude Code, Opus 5.5) · **fecha:** 2026-10-25
 - **1. Prompt (literal):**
-  > sigamos con la etapa 4
+  > sigueme explicando la etapa 4
 - **2. Respuesta de la IA (parte relevante, literal):** una tabla con la columna "Varianza Beta:
   μ(1−μ)/(1+φ)", calculada con el φ = 3,83 del ajuste marginal, y la conclusión:
   > La Beta con φ constante acierta la dirección y es exacta en los deciles bajos, pero **se queda
@@ -122,48 +103,12 @@ en ese momento.
 
 ---
 
-### JR-4. "El techo de la tanh subestimaría de forma sistemática los créditos de LGD alta"
-
-- **Categoría:** conceptos (confundir error individual con sesgo de la media condicional)
-- **IA:** Claude (Claude Code, Opus 5.5) · **fecha:** 2026-10-25
-- **1. Prompt (literal):**
-  > si, pero antes, cuando se concluya esos 75 min que faltaria? hago pr ya?
-- **2. Respuesta de la IA (parte relevante, literal; la IA la marcó como hipótesis sin verificar):**
-  > Mi hipótesis, **todavía sin verificar**: las dos usan la configuración 9, con activación **tanh**,
-  > que está acotada entre −1 y 1. Si las neuronas de la última capa oculta se saturan, el logit de
-  > salida tiene un máximo y la predicción no puede subir más. Esto subestimaría de forma sistemática
-  > los créditos de LGD alta, que son justamente los más costosos para la pérdida esperada.
-- **3. Sospecha:** un modelo que predice medias condicionales no debería predecir 0,95 si las variables
-  no distinguen qué créditos terminan con una LGD tan alta. Que las predicciones individuales no lleguen a
-  esos valores no implica un sesgo.
-- **4. Evidencia** (`src/search/lgd_random_search.py --fase diagnostico`; sección 6.3, apartado 7):
-  - **El mecanismo existe.** El techo teórico $\sigma(b + \sum_j \lvert w_j\rvert)$ vale 0,877 en promedio
-    en los 30 modelos y la predicción máxima es 0,875. En el 1 % de predicciones más altas, el 44 % de las
-    neuronas tanh están saturadas (19 % en el resto).
-  - **La consecuencia no.** En el decil más alto de la predicción, la BCE predice 0,864 y lo observado es
-    0,868 (bien calibrada). Los créditos con LGD observada mayor que 0,9 (16,5 % de la validación) se
-    predicen en promedio entre 0,744 y 0,763 con **todos** los modelos, incluida la lineal (0,757), que
-    no tiene techo.
-  - **Experimento:** la misma configuración con ReLU (sin techo), 5 semillas, da un RMSE medio de 0,17888
-    frente a 0,17734 con tanh; la ReLU es peor en las 5 semillas. Quitar el techo no mejora nada, aunque
-    la configuración se eligió con tanh.
-  - Tablas `results/tables/lgd_diagnostico_techo.csv`, `lgd_calibracion_deciles.csv` y
-    `lgd_techo_relu.csv`.
-- **5. Corrección:** el mecanismo propuesto (saturación de la tanh) es real, pero no sesga la media
-  condicional. La subpredicción de los créditos de LGD muy alta es el encogimiento hacia la media
-  condicional (JR-2), común a todos los modelos.
-- **6. Lección:** para afirmar que un modelo "subestima" un grupo hay que comparar medias predichas y
-  observadas dentro de grupos definidos por la **predicción** (calibración por deciles), no mirar los
-  valores individuales extremos.
-
----
-
-### JR-5. "La Beta subestima por la asimetría a la izquierda; esto explica su peor RMSE" (causa sin evidencia)
+### JR-4. "La Beta subestima por la asimetría a la izquierda; esto explica su peor RMSE" (causa sin evidencia)
 
 - **Categoría:** conceptos (atribuir una causa sin comprobarla)
 - **IA:** Claude (Claude Code, Opus 5.5) · **fecha:** 2026-10-25
 - **1. Prompt (literal):**
-  > sigamos con la etapa 7
+  > sigueme explicando la etapa 7
 - **2. Respuesta de la IA (parte relevante, literal):**
   > Encaja con lo que dijimos en la Etapa 1: si los datos no son Beta, su ecuación iguala E[logit Y] y
   > no E[Y], y con una LGD asimétrica a la izquierda eso tira la predicción hacia abajo. **Esto explica
@@ -195,7 +140,7 @@ en ese momento.
 
 ---
 
-### Verificaciones sin hallazgo (Juan David Robayo)
+### Verificaciones sin hallazgo
 
 Afirmaciones (de una IA o propias) que se comprobaron y resultaron correctas, más un problema de código
 encontrado al verificar.
@@ -214,5 +159,5 @@ encontrado al verificar.
 | Revisión automática de Sourcery (otra IA) sobre el PR #9: carga insegura con joblib, NaN en `gradiente_beta` con logits extremos y carpeta de figuras inexistente | lectura del código | las tres observaciones son correctas o parcialmente correctas; ninguna es una alucinación |
 | Referencias APA de 3.3, 3.5 y 5.1 entregadas por una IA como "verificadas" (2026-10-30; el prompt no se conservó, por eso no se registra como hallazgo) | Crossref (`api.crossref.org/works/<DOI>`), arXiv, JMLR y el registro del libro de MIT Press | **Errores encontrados:** para Papke y Wooldridge (1996) dio dos DOI distintos, y el de la forma `(199611/12)` no está en Crossref (el correcto termina en `(199611)11:6<619::AID-JAE418>3.0.CO;2-1`); para Platt dio 1999 y 2000 en la misma respuesta (el libro de MIT Press es de 2000); omitió el número 85 de scikit-learn en *JMLR* 12; citó ICLR como "Proceedings" aunque no tiene actas formales. Las otras seis entradas eran correctas. Se corrigieron en las secciones |
 
-**Tabla.** Verificaciones hechas por Juan David Robayo. *Fuente:* elaboración propia; pruebas en `tests/test_losses.py` y
+**Tabla.** Verificaciones hechas por el grupo. *Fuente:* elaboración propia; pruebas en `tests/test_losses.py` y
 `tests/test_optim.py`.

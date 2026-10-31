@@ -695,7 +695,34 @@
         details.adv { margin-top: 20px; border: 1px solid var(--line); padding: 10px 14px; background: #14241d }
         details.adv summary { cursor: pointer; font: 12px var(--mono); color: var(--cyan) }
         .label-line output { text-align: right }
+        details.teoria { border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow); margin-bottom: 18px }
+        details.teoria summary { cursor: pointer; padding: 18px 22px; display: flex; justify-content: space-between; align-items: baseline; gap: 14px; flex-wrap: wrap }
+        details.teoria summary span { font-size: 20px; font-weight: 600; letter-spacing: -.02em }
+        details.teoria summary small { font: 11px var(--mono); color: var(--cyan); letter-spacing: .08em; text-transform: uppercase }
+        details.teoria[open] summary { border-bottom: 1px solid var(--line) }
+        .prosa { padding: 6px 22px 22px; max-width: 860px; line-height: 1.65; font-size: 15px }
+        .prosa h3 { font-size: 19px; margin: 30px 0 8px; color: var(--lime) }
+        .prosa a { color: var(--cyan); overflow-wrap: anywhere }
+        .prosa code { font: 13px var(--mono); background: var(--panel2); padding: 1px 5px; overflow-wrap: anywhere }
+        .prosa pre { background: #0c1713; border: 1px solid var(--line); padding: 14px; overflow-x: auto }
+        .prosa pre code { background: none; padding: 0 }
+        .prosa blockquote { margin: 16px 0; padding: 4px 16px; border-left: 3px solid var(--lime); color: var(--muted) }
+        .prosa hr { border: 0; border-top: 1px dashed var(--line); margin: 28px 0 }
+        .prosa .eq, .prosa .katex-display { overflow-x: auto; overflow-y: hidden }
+        .prosa .eq, .prosa .tabla, .prosa .katex { position: relative }
+        .prosa .tabla { overflow-x: auto; margin: 16px 0 6px }
+        .prosa table { border-collapse: collapse; font-size: 14px; min-width: 100% }
+        .prosa th, .prosa td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top }
+        .prosa th { background: var(--panel2); font: 600 12px var(--mono) }
+        .prosa figure { margin: 18px 0 6px }
+        .prosa figure img { max-width: 100%; height: auto; display: block; margin: auto; background: #fff; border-radius: 6px }
+        .prosa .cap { font-size: 13px; color: var(--muted); margin-top: 6px }
+        .refs.prosa { padding: 0; max-width: none }
+        .refs ul { list-style: none; padding: 0; margin: 0 }
+        .refs li { padding-left: 2em; text-indent: -2em; margin-bottom: 10px }
+        @media(max-width:480px) { .prosa { padding: 4px 14px 16px; font-size: 14px } details.teoria summary { padding: 14px } }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 
 
@@ -704,7 +731,7 @@
         <div class="wrap nav">
             <div class="brand">[LAB] / RIESGO_CREDITICIO</div>
             <nav class="navlinks"><a href="#simulador">SIMULADOR</a><a href="#metodo">METODOLOGÍA</a><a
-                    href="#resultados">RESULTADOS</a></nav>
+                    href="#resultados">RESULTADOS</a><a href="#fundamentos">FUNDAMENTOS</a></nav>
         </div>
     </header>
     <main>
@@ -854,6 +881,1696 @@
                 </div>
             </div>
         </section>
+        <section class="wrap section" id="fundamentos">
+            <div class="section-head">
+                <div>
+                    <div class="eyebrow">Fundamentación matemática</div>
+                    <h2>Las ecuaciones detrás de los modelos</h2>
+                </div>
+                <p>Derivaciones completas del reporte técnico. Despliega un tema para leerlo.</p>
+            </div>
+<!-- teoria:inicio -->
+<details class="teoria" id="teoria-perdidas">
+<summary><span>Funciones de pérdida por máxima verosimilitud</span><small>Juan David Robayo</small></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta parte tiene dos bloques. El primero deriva cada función de pérdida del proyecto a partir de
+un modelo probabilístico. El segundo aplica esas derivaciones a la LGD: fija la activación de salida,
+las candidatas, el criterio de selección y unas predicciones, <strong>antes</strong> de la búsqueda de
+hiperparámetros, para que la elección no se justifique a posteriori con el resultado que salió mejor
+por azar.</p>
+<p><em>Nota de versión:</em> las cifras de la segunda parte se recalcularon cuando el equipo volvió a sortear
+la partición aleatoria (<code>split_seed: 90</code>). Ninguna conclusión cambió.</p>
+</blockquote>
+<h3>Principio: de un modelo probabilístico a una pérdida</h3>
+<p>Sean $n$ observaciones independientes $(x_i, y_i)$ y un modelo $p(y \mid x; \theta)$. La máxima
+verosimilitud elige $\theta$ maximizando $\prod_i p(y_i \mid x_i; \theta)$, lo que equivale a minimizar
+la log-verosimilitud negativa promedio (NLL):</p>
+<div class="eq">$$\ell(\theta) = -\frac{1}{n}\sum_{i=1}^{n} \ln p(y_i \mid x_i; \theta).$$</div>
+<p>En todos los modelos del proyecto, la red (o la regresión) produce un número real $z_i = f(x_i; \theta)$,
+el <em>logit</em>, y el parámetro de la distribución se obtiene de él. Por la regla de la cadena,</p>
+<div class="eq">$$\frac{\partial \ell}{\partial \theta} = \frac{1}{n}\sum_{i=1}^{n} \frac{\partial \ell_i}{\partial z_i}\,\frac{\partial z_i}{\partial \theta},$$</div>
+<p>donde $\ell_i$ es el término del dato $i$. El segundo factor lo calcula la retropropagación (ver Retropropagación);
+lo que cambia de una pérdida a otra es el primero, $\partial \ell_i / \partial z_i$, que se deriva abajo
+para cada caso. Se usará la sigmoide $\sigma(z) = 1/(1+e^{-z})$ y su derivada
+$\sigma'(z) = \sigma(z)\,(1-\sigma(z))$.</p>
+<h3>Bernoulli → entropía cruzada binaria (BCE): PD</h3>
+<p><strong>Modelo.</strong> $Y \mid x \sim \text{Bernoulli}(\mu)$ con $\mu = \sigma(z)$, de modo que
+$p(y \mid x) = \mu^{y}(1-\mu)^{1-y}$ para $y \in \lbrace 0, 1 \rbrace$.</p>
+<p><strong>Pérdida.</strong> Tomando $-\ln p$:</p>
+<div class="eq">$$\ell_i = -\left[\, y_i \ln \mu_i + (1-y_i)\ln(1-\mu_i) \,\right].$$</div>
+<p><strong>Forma estable.</strong> Como $\ln \sigma(z) = -\ln(1+e^{-z})$, $\ln(1-\sigma(z)) = -\ln(1+e^{z})$ y
+$\ln(1+e^{-z}) = \ln(1+e^{z}) - z$,</p>
+<div class="eq">$$\ell_i = \ln\left(1+e^{z_i}\right) - y_i z_i .$$</div>
+<p>Esta es la forma que se implementa (<code>bce_con_logits</code> en <code>src/models/losses.py</code>), con
+$\ln(1+e^{z})$ calculado como <code>logaddexp(0, z)</code>: no hay desbordamiento con logits grandes y se evita
+calcular $\ln 0$ cuando la sigmoide se redondea a 0 o a 1.</p>
+<p><strong>Gradiente.</strong> $\dfrac{\partial \ell_i}{\partial z_i} = \sigma(z_i) - y_i = \mu_i - y_i$. No contiene el
+factor $\sigma'(z)$, así que no se apaga cuando la red está muy segura y se equivoca.</p>
+<p><strong>Regresión logística.</strong> Es el caso $z = \beta_0 + \beta^\top x$: la logística de referencia de PD se
+estima minimizando exactamente esta pérdida (más la penalización; ver Optimizador y regularización). Su hessiano,
+$\frac{1}{n}\sum_i \mu_i(1-\mu_i)\,x_i x_i^\top$, es semidefinido positivo, así que el problema es convexo.
+La red de PD usa la misma pérdida con $z$ dado por el MLP.</p>
+<h3>Normal → error cuadrático medio (MSE)</h3>
+<p><strong>Modelo.</strong> $Y \mid x \sim \mathcal{N}(\mu, s^2)$ con varianza $s^2$ constante:</p>
+<div class="eq">$$\ell_i = \tfrac{1}{2}\ln(2\pi s^2) + \frac{(y_i - \mu_i)^2}{2 s^2}.$$</div>
+<p>Con $s^2$ fijo, el primer término no depende de $\theta$ y el factor $1/(2s^2)$ no cambia el
+minimizador, así que minimizar la NLL equivale a minimizar $\frac{1}{n}\sum_i (y_i - \mu_i)^2$.</p>
+<ul>
+<li><strong>Regresión lineal</strong> (referencia de LGD): $\mu = \beta_0 + \beta^\top x$, es decir, mínimos
+  cuadrados ordinarios.</li>
+<li><strong>Red de LGD con salida sigmoide</strong> (<code>mse_con_logits</code>): $\mu = \sigma(z)$ y</li>
+</ul>
+<div class="eq">$$\frac{\partial \ell_i}{\partial z_i} = 2\,(\mu_i - y_i)\,\mu_i(1-\mu_i).$$</div>
+<p>El factor $\mu(1-\mu)$ tiende a 0 cuando la sigmoide satura: si la red predice 0,999 para un crédito con
+LGD 0,1, el gradiente es casi nulo (<code>test_mse_se_satura_con_logits_extremos</code>).</p>
+<h3>BCE fraccional: cuasi-verosimilitud para $y \in [0, 1]$</h3>
+<p><strong>Pérdida.</strong> Es la propuesta de Papke y Wooldridge (1996) para respuestas fraccionales: la misma
+expresión de la BCE, $\ell_i = \ln(1+e^{z_i}) - y_i z_i$, pero con $y_i$ continua
+en $[0, 1]$ (<code>bce_fraccional_con_logits</code>, que es la que devuelve <code>get_loss("bce")</code>).</p>
+<p><strong>No es una verosimilitud.</strong> $\mu^{y}(1-\mu)^{1-y}$ no integra 1 sobre $[0, 1]$:
+$\int_0^1 \mu^{y}(1-\mu)^{1-y}\,dy = (2\mu - 1)/\ln\frac{\mu}{1-\mu}$, que vale 0,5 en $\mu = 0{,}5$. Por
+eso se habla de cuasi-verosimilitud (Wedderburn, 1974): solo se especifica la media, $E[Y \mid x] = \sigma(z)$, y la forma
+de la pérdida corresponde a suponer $\text{Var}(Y \mid x) \propto \mu(1-\mu)$.</p>
+<p><strong>Por qué funciona.</strong> Fijado $x$, sea $m = E[Y \mid x]$. La pérdida esperada es
+$-[\,m \ln \mu + (1-m)\ln(1-\mu)\,]$ y su derivada respecto a $\mu$,
+$-m/\mu + (1-m)/(1-\mu)$, se anula en $\mu = m$. El minimizador es la media condicional <strong>cualquiera
+que sea la distribución de $Y$</strong> (<code>test_bce_fraccional_estima_la_media</code>).</p>
+<p><strong>Gradiente.</strong> Igual que en la BCE: $\partial \ell_i / \partial z_i = \mu_i - y_i$. Acepta 0 y 1
+exactos sin tratamiento especial.</p>
+<h3>Beta: regresión Beta con media y precisión</h3>
+<p><strong>Modelo.</strong> Con la parametrización de Ferrari y Cribari-Neto (2004), $Y \mid x \sim \text{Beta}(a, b)$ con $a = \mu\phi$, $b = (1-\mu)\phi$, $\mu = \sigma(z)$ y
+una precisión $\phi &gt; 0$ común que se aprende como $\phi = e^{\eta}$. Así $E[Y] = \mu$ y
+$\text{Var}(Y) = \mu(1-\mu)/(1+\phi)$. La densidad es</p>
+<div class="eq">$$p(y) = \frac{\Gamma(\phi)}{\Gamma(a)\,\Gamma(b)}\, y^{a-1}(1-y)^{b-1}, \qquad 0 &lt; y &lt; 1,$$</div>
+<p>y la pérdida (<code>beta_con_logits</code>)</p>
+<div class="eq">$$\ell_i = \ln\Gamma(a_i) + \ln\Gamma(b_i) - \ln\Gamma(\phi) - (a_i - 1)\ln y_i - (b_i - 1)\ln(1-y_i).$$</div>
+<p><strong>Gradientes.</strong> Con $\psi$ la función digamma y usando $\partial a/\partial z = \phi\mu(1-\mu)$ y
+$\partial b/\partial z = -\phi\mu(1-\mu)$:</p>
+<div class="eq">$$\frac{\partial \ell_i}{\partial z_i} = \phi\,\mu_i(1-\mu_i)\left[\left(\psi(a_i) - \ln y_i\right) - \left(\psi(b_i) - \ln(1-y_i)\right)\right],$$</div>
+<div class="eq">$$\frac{\partial \ell_i}{\partial \phi} = \mu_i\psi(a_i) + (1-\mu_i)\psi(b_i) - \psi(\phi) - \mu_i\ln y_i - (1-\mu_i)\ln(1-y_i),
+\qquad \frac{\partial \ell_i}{\partial \eta} = \phi\,\frac{\partial \ell_i}{\partial \phi}.$$</div>
+<p>Como $E[\ln Y] = \psi(a) - \psi(\phi)$ y $E[\ln(1-Y)] = \psi(b) - \psi(\phi)$, el primer gradiente se
+anula en promedio cuando el modelo reproduce $E[\ln Y - \ln(1-Y)]$: la máxima verosimilitud de la Beta
+iguala <strong>log-momentos</strong>, no la media (consecuencia que se verifica con datos más abajo, en Las tres candidatas frente a los datos).</p>
+<p><strong>Ceros y unos.</strong> $\ln 0$ no existe, así que $y$ se recorta a $[\varepsilon, 1-\varepsilon]$ con
+$\varepsilon = 10^{-4}$; la sensibilidad a $\varepsilon$ se reporta en los resultados de la red de LGD.</p>
+<p><strong>Verificación.</strong> Las cuatro pérdidas y sus gradientes analíticos se compararon con la diferenciación
+automática de PyTorch y con diferencias finitas (<code>gradcheck</code>), y los valores con implementaciones de
+referencia (PyTorch para BCE y MSE, SciPy para la Beta) en <code>tests/test_losses.py</code>.</p>
+<hr />
+<h3>La LGD: variable objetivo y su distribución</h3>
+<p>La LGD se construyó con la opción A (ver Variables objetivo). Para los créditos incumplidos,
+LGD $= \text{clip}\big((F - P - R + C)/F,\ 0,\ 1\big)$, con $F$ = <code>funded_amnt</code>, $P$ = <code>total_rec_prncp</code>,
+$R$ = <code>recoveries</code> y $C$ = <code>collection_recovery_fee</code>. El análisis de esta parte usa la
+partición aleatoria de entrenamiento ($n = 41.173$).</p>
+<p><strong>Forma.</strong> Media 0,704, desviación estándar 0,205 y <strong>asimetría −0,99</strong>: una cola larga hacia 0 y la
+masa concentrada entre 0,6 y 0,95. Solo el 0,69 % de los valores son exactamente 0 o 1 (31 y 253
+créditos). Como se observa en la Figura 1, la distribución es unimodal, con el pico entre 0,78 y
+0,80, sin las masas en los extremos que a veces se describen para la LGD.</p>
+<figure><img alt="Figura 1" src="results/figures/lgd_ajuste_beta_normal.png" loading="lazy" onerror="figRespaldo(this)"></figure>
+<p class="cap"><strong>Figura 1.</strong> LGD observada frente a las densidades Beta y normal ajustadas por máxima
+verosimilitud. Las bandas rojas marcan valores imposibles (fuera de [0, 1]).
+<em>Fuente:</em> elaboración propia con datos de Lending Club (Kaggle), partición aleatoria de
+entrenamiento de LGD; código en <code>src/models/lgd_mlp.py</code> (<code>figuras_distribucion_lgd</code>).</p>
+<p><strong>Ajuste de dos distribuciones candidatas.</strong> Se ajustaron por máxima verosimilitud una normal y una
+Beta con media y precisión constantes. La Beta se ajustó con la misma pérdida que usa la red
+(<code>beta_con_logits</code>) y dio $\mu = 0{,}694$ y $\phi = 3{,}82$. La Tabla 1 compara los cuantiles.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Cuantil</th>
+<th>LGD observada</th>
+<th>Beta ajustada</th>
+<th>Normal ajustada</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 %</td>
+<td>0,101</td>
+<td>0,160</td>
+<td>0,227</td>
+</tr>
+<tr>
+<td>5 %</td>
+<td>0,286</td>
+<td>0,296</td>
+<td>0,367</td>
+</tr>
+<tr>
+<td>25 %</td>
+<td>0,594</td>
+<td>0,553</td>
+<td>0,566</td>
+</tr>
+<tr>
+<td>50 %</td>
+<td>0,750</td>
+<td>0,731</td>
+<td>0,704</td>
+</tr>
+<tr>
+<td>75 %</td>
+<td>0,858</td>
+<td>0,867</td>
+<td>0,842</td>
+</tr>
+<tr>
+<td>95 %</td>
+<td>0,956</td>
+<td>0,969</td>
+<td>1,041</td>
+</tr>
+<tr>
+<td>99 %</td>
+<td>0,988</td>
+<td>0,992</td>
+<td>1,180</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 1.</strong> Cuantiles de la LGD observada y de las distribuciones ajustadas. <em>Fuente:</em> elaboración
+propia, misma partición y código que la Figura 1.</p>
+<ul>
+<li>La normal asigna un <strong>7,4 % de su masa fuera de [0, 1]</strong>; su percentil 99 es 1,18, una LGD imposible.</li>
+<li>La log-verosimilitud media es 0,283 con la Beta y 0,167 con la normal.</li>
+<li>La Beta no es perfecta: sitúa la moda en 0,91 cuando el pico observado está entre 0,78 y 0,80, y
+  sobrestima la cola baja (percentil 1: 0,160 frente a 0,101).</li>
+</ul>
+<p>La Figura 2 lo muestra en forma de gráfico QQ: frente a la Beta, los cuantiles observados siguen la
+diagonal salvo en la cola baja; frente a la normal describen una S y se salen del intervalo [0, 1].</p>
+<figure><img alt="Figura 2" src="results/figures/lgd_qq_beta_normal.png" loading="lazy" onerror="figRespaldo(this)"></figure>
+<p class="cap"><strong>Figura 2.</strong> Gráficos QQ de la LGD observada contra la Beta (izquierda) y la normal (derecha)
+ajustadas. <em>Fuente:</em> elaboración propia, misma partición y código que la Figura 1.</p>
+<p><strong>La varianza depende de la media.</strong> Para ver cómo cambia la dispersión con el nivel de la LGD, se
+agruparon los créditos en deciles de la predicción de la regresión lineal de referencia y se calculó
+la varianza de la LGD dentro de cada decil. Como se observa en la Figura 3, la varianza <strong>cae de
+0,051 a 0,010</strong> (unas cinco veces) cuando la LGD media del decil pasa de 0,58 a 0,86.</p>
+<figure><img alt="Figura 3" src="results/figures/lgd_varianza_por_decil.png" loading="lazy" onerror="figRespaldo(this)"></figure>
+<p class="cap"><strong>Figura 3.</strong> Varianza de la LGD dentro de cada decil de la predicción lineal, frente a la forma
+que supone cada función de pérdida (cada supuesto se escala a la varianza promedio observada, de modo
+que solo se compara la forma). <em>Fuente:</em> elaboración propia, misma partición y código que la
+Figura 1.</p>
+<p><strong>Las variables explican una parte pequeña de la LGD.</strong> La regresión lineal de referencia obtiene
+$R^2 = 0{,}19$ en validación, y sus predicciones tienen una desviación estándar de 0,088 frente a 0,202
+de la LGD observada en ese mismo conjunto.</p>
+<h3>Activación de salida: sigmoide</h3>
+<p>La LGD pertenece a [0, 1], así que la salida de la red debe estar en ese intervalo. Se usa la sigmoide,
+$\mu = \sigma(z)$, aplicada al logit $z$ de la última capa lineal. La red entrega $z$ y la sigmoide se
+aplica dentro de la función de pérdida y al predecir: es la misma salida, pero permite calcular de forma
+estable las pérdidas que contienen logaritmos (ver la forma estable de la BCE). Las tres candidatas comparten esta salida,
+de modo que la única diferencia entre ellas es el modelo probabilístico del error.</p>
+<h3>Las tres candidatas frente a los datos</h3>
+<ul>
+<li><strong>MSE.</strong> A favor: su minimizador es $E[Y \mid x]$ sea cual sea la distribución real, y
+  optimiza directamente el RMSE. En contra: supone varianza constante, y la Figura 3 muestra que la
+  varianza cae unas cinco veces; el modelo normal pone probabilidad fuera de [0, 1] (Tabla 1); y con
+  salida sigmoide el gradiente se apaga por el factor $\mu(1-\mu)$.</li>
+<li><strong>BCE fraccional.</strong> A favor: también estima $E[Y \mid x]$ para cualquier distribución;
+  acepta 0 y 1; su gradiente no se satura; y su varianza implícita $\mu(1-\mu)$ va en la dirección de la
+  observada. En contra: esa forma capta solo parte de la caída (Figura 3); no da una distribución
+  predictiva completa; y su valor tiene un piso igual a la entropía de $y$, así que no es comparable con
+  el de las otras pérdidas.</li>
+<li><strong>Beta.</strong> A favor: es una verosimilitud verdadera en (0, 1), describe la distribución
+  marginal mucho mejor que la normal (Tabla 1, Figuras 1 y 2), da una distribución predictiva
+  completa y su gradiente no se satura. En contra:<ul>
+<li>No admite 0 ni 1 exactos. Con el recorte, esos puntos (0,69 % de los datos) entran con
+$\ln\varepsilon$, mucho más que un dato típico ($\ln 0{,}75 = -0{,}29$). En el ajuste sin variables
+mueven sobre todo $\phi$ (de 4,12 con $\varepsilon = 10^{-2}$ a 3,71 con
+$\varepsilon = 1{,}2\times10^{-5}$) y casi nada la media ajustada (entre 0,6943 y 0,6946).</li>
+<li>Con $\phi$ constante supone la misma forma de varianza que la BCE fraccional, que se queda corta
+frente a la caída observada (Figura 3).</li>
+<li><strong>No iguala la media muestral.</strong> Como se vio en la regresión Beta, la máxima verosimilitud iguala los
+log-momentos. Solo si los datos siguen una Beta eso equivale a estimar bien la media. Con 41.173
+valores simulados de la Beta ajustada (semilla 0), la media ajustada coincide con la muestral
+(diferencia +0,0003); con la LGD observada, sin variables, queda 0,0095 por debajo (0,694 frente a
+0,704), y 0,0099 por debajo si se
+excluyen los 0 y 1 exactos, así que la diferencia se debe a la forma de la distribución y no al
+recorte.</li>
+</ul>
+</li>
+</ul>
+<h3>Criterio de selección (fijado antes de entrenar)</h3>
+<ol>
+<li><strong>Métrica principal:</strong> RMSE en la <strong>validación aleatoria</strong>. Las tres pérdidas se comparan por la
+   métrica de evaluación y no por sus propios valores, que están en escalas distintas.</li>
+<li><strong>Partición:</strong> aleatoria. En la temporal, la LGD media es 0,615 en entrenamiento, 0,768 en validación
+   y 0,905 en prueba, por la censura de las recuperaciones de los créditos recientes (ver Variables objetivo);
+   seleccionar con ella castigaría a cualquier modelo por un artefacto de los datos. La partición
+   temporal se reporta como análisis de estabilidad.</li>
+<li><strong>Desempate:</strong> comparación de la distribución de las predicciones con la distribución observada,
+   como pide el enunciado (histograma y cuantiles de las predicciones puntuales de cada modelo).</li>
+<li><strong>Presupuesto:</strong> las tres pérdidas entran como un hiperparámetro más en la misma búsqueda, con el
+   mismo presupuesto, que se declara en la metodología.</li>
+<li><strong>Conjunto de prueba:</strong> no se usa para seleccionar; se evalúa una sola vez al final.</li>
+</ol>
+<p><em>Nota añadida después de la búsqueda.</em> El punto 3 no decía qué diferencia cuenta como empate. Al
+aplicarlo se fijó una tolerancia de $2{,}5\times10^{-4}$ de RMSE, la desviación entre semillas medida en
+la primera corrida, y la comparación de distribuciones se resumió en la búsqueda con la desviación
+estándar de las predicciones (todas las redes encogen, así que la de mayor dispersión es la más cercana
+a la observada). En los resultados de la red de LGD se comparan además el estadístico KS y la distancia de Wasserstein.</p>
+<h3>Predicciones escritas antes de entrenar</h3>
+<p>Se contrastan con los resultados de la red de LGD.</p>
+<ol>
+<li><strong>RMSE parecido entre las tres pérdidas.</strong> Las tres estiman (o aproximan) la media condicional, y el
+   $R^2$ de la lineal (0,19) sugiere que el techo lo pone la información de las variables más que la
+   pérdida.</li>
+<li><strong>Las predicciones de las tres estarán encogidas</strong> respecto de la LGD observada (desviación estándar
+   muy por debajo de 0,20, como ya ocurre con la lineal). Es una propiedad de predecir medias
+   condicionales, no un defecto de una pérdida en particular.</li>
+<li><strong>La MSE no debería superar a la BCE fraccional</strong>, porque supone varianza constante cuando la
+   varianza real cambia con la media; la diferencia, si la hay, debería verse en los créditos de LGD alta.</li>
+<li><strong>La Beta será la que mejor describa la forma de la distribución</strong>, pero no necesariamente la de
+   menor RMSE.</li>
+</ol>
+<h3>Limitaciones y ajustes posibles</h3>
+<ul>
+<li><strong>Precisión no constante.</strong> La varianza observada cae más rápido que $\mu(1-\mu)$ (Figura 3), lo
+  que sugiere que $\phi$ podría depender de las variables. Modelarlo exigiría una segunda salida en la
+  red; queda como posible ajuste si la distribución predicha no reproduce la observada.</li>
+<li><strong>Sensibilidad a $\varepsilon$</strong> en la Beta: se evalúa con
+  $\varepsilon \in \lbrace 10^{-2}, 10^{-3}, 10^{-4}, 1{,}2\times10^{-5}\rbrace$ (el último equivale a la
+  transformación de Smithson y Verkuilen (2006) con el $n$ de entrenamiento).</li>
+<li><strong>Análisis marginal.</strong> La Tabla 1 y las Figuras 1 y 2 describen la distribución de la LGD
+  sin condicionar a las variables; la red ajusta una distribución por crédito, así que la evidencia
+  decisiva es la comparación de los resultados de la red de LGD.</li>
+<li><strong>Censura temporal</strong> de las recuperaciones (ver Variables objetivo).</li>
+</ul>
+</div>
+</details>
+<details class="teoria" id="teoria-optimizador">
+<summary><span>Optimizador y regularización</span><small>Juan David Robayo</small></summary>
+<div class="prosa">
+<blockquote>
+<p>Las funciones de pérdida dicen <strong>qué</strong> se minimiza. Esta parte dice <strong>cómo</strong> se minimiza (SGD y
+Adam) y <strong>cómo se evita el sobreajuste</strong> (L1, L2, dropout y parada temprana). Cada propiedad que se
+afirma está respaldada por una prueba de <code>tests/test_optim.py</code>, que usa un Adam escrito a mano
+(<code>src/models/optim.py</code>) y lo compara con el de PyTorch.</p>
+</blockquote>
+<h3>Descenso de gradiente y SGD</h3>
+<p>El gradiente $g_t = \nabla_\theta L(\theta_{t-1})$ apunta hacia donde la pérdida sube más rápido. El
+descenso de gradiente da un paso de tamaño $\eta$ (la tasa de aprendizaje) en la dirección contraria:</p>
+<div class="eq">$$\theta_t = \theta_{t-1} - \eta\, g_t.$$</div>
+<p>Con 163.541 créditos de PD o 41.173 de LGD, calcular el gradiente con todos los datos en cada paso es
+caro. El <strong>descenso de gradiente estocástico (SGD)</strong> usa el gradiente de un lote aleatorio (256 créditos
+en la red de LGD, 512 en la de PD). Es un estimador ruidoso pero insesgado del gradiente completo, y
+permite muchos pasos por época. Una <strong>época</strong> es una pasada completa por el entrenamiento; los lotes se
+barajan en cada época con un generador con semilla.</p>
+<p>SGD tiene tres problemas que motivan Adam:</p>
+<ol>
+<li><strong>Una sola $\eta$ para todos los parámetros.</strong> Si unos tienen gradientes grandes y otros pequeños,
+   ninguna $\eta$ sirve para todos.</li>
+<li><strong>El ruido del lote</strong> hace zigzaguear la trayectoria.</li>
+<li><strong>Depende de la escala de la pérdida.</strong> Multiplicar la pérdida por 100 multiplica el paso por 100.</li>
+</ol>
+<h3>Adam</h3>
+<p>Adam (Kingma y Ba, 2015) combina dos promedios móviles exponenciales del gradiente, elemento a elemento:</p>
+<div class="eq">$$m_t = \beta_1 m_{t-1} + (1-\beta_1)\, g_t, \qquad v_t = \beta_2 v_{t-1} + (1-\beta_2)\, g_t^2.$$</div>
+<ul>
+<li>$m_t$ es un <strong>momento</strong>: suaviza el ruido del lote y acelera en las direcciones consistentes. Con
+  $\beta_1 = 0{,}9$ recuerda del orden de 10 pasos.</li>
+<li>$\sqrt{v_t}$ estima el <strong>tamaño típico del gradiente</strong> de cada parámetro. Dividir por él da a cada
+  parámetro su propia tasa de aprendizaje efectiva.</li>
+</ul>
+<p><strong>Corrección de sesgo.</strong> Los dos promedios arrancan en $m_0 = v_0 = 0$, así que al principio están
+sesgados hacia cero. Desarrollando la recursión,</p>
+<div class="eq">$$m_t = (1-\beta_1)\sum_{k=1}^{t}\beta_1^{t-k} g_k \quad\Rightarrow\quad
+\mathbb{E}[m_t] = \mathbb{E}[g]\,(1-\beta_1)\sum_{k=1}^{t}\beta_1^{t-k} = \mathbb{E}[g]\,(1-\beta_1^t),$$</div>
+<p>si el gradiente tiene media constante (la suma geométrica vale $(1-\beta_1^t)/(1-\beta_1)$). Lo mismo
+pasa con $v_t$ y $\beta_2$. Se corrige dividiendo:</p>
+<div class="eq">$$\hat m_t = \frac{m_t}{1-\beta_1^t}, \qquad \hat v_t = \frac{v_t}{1-\beta_2^t}.$$</div>
+<p><strong>Actualización:</strong></p>
+<div class="eq">$$\theta_t = \theta_{t-1} - \eta\,\frac{\hat m_t}{\sqrt{\hat v_t} + \varepsilon}, \qquad
+\beta_1 = 0{,}9,\quad \beta_2 = 0{,}999,\quad \varepsilon = 10^{-8}.$$</div>
+<p>Son los valores por defecto de <code>torch.optim.Adam</code> (comprobado en PyTorch 2.14.1). El contador $t$ empieza
+en 1 en el primer paso (con $t = 0$ la corrección dividiría por cero), y $\varepsilon$ va fuera de la raíz.</p>
+<p>La implementación propia sigue las ecuaciones línea a línea:</p>
+<pre><code class="language-python">estado[&quot;t&quot;] += 1
+t = estado[&quot;t&quot;]
+with torch.no_grad():
+    for p, m, v in zip(params, estado[&quot;m&quot;], estado[&quot;v&quot;]):
+        m.mul_(b1).add_((1 - b1) * p.grad)                     # m_t
+        v.mul_(b2).add_((1 - b2) * p.grad ** 2)                # v_t
+        m_hat, v_hat = m / (1 - b1 ** t), v / (1 - b2 ** t)    # corrección de sesgo
+        p -= lr * m_hat / (v_hat.sqrt() + eps)                 # actualización
+</code></pre>
+<p><em>Fragmento de <code>paso_adam</code> en <code>src/models/optim.py</code>.</em></p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Propiedad</th>
+<th>Por qué se cumple</th>
+<th>Prueba que la respalda</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>El Adam propio es el de PyTorch</td>
+<td>Mismas ecuaciones y mismo orden de operaciones</td>
+<td><code>test_adam_igual_a_pytorch</code>: mismos parámetros en <strong>cada uno</strong> de 50 pasos (float64)</td>
+</tr>
+<tr>
+<td>El primer paso mide $\eta$</td>
+<td>En $t = 1$, $\hat m_1 = g_1$ y $\hat v_1 = g_1^2$: el paso es $\eta\, g_1/\lvert g_1\rvert$</td>
+<td><code>test_adam_primer_paso_mide_lr</code>: paso de exactamente 0,01 con gradientes de 0,004 y de 100. Sin corrección de sesgo sería $\sqrt{10}\,\eta \approx 3{,}16\,\eta$</td>
+</tr>
+<tr>
+<td>Invariancia a la escala</td>
+<td>Si la pérdida se multiplica por $c$, $\hat m$ y $\sqrt{\hat v}$ también, y el cociente no cambia</td>
+<td><code>test_adam_invariante_a_la_escala_y_sgd_no</code>: pérdida × 1000 deja igual la trayectoria de Adam; con SGD los pasos crecen más de 100 veces</td>
+</tr>
+<tr>
+<td>Adam tolera el mal condicionamiento</td>
+<td>Reescala cada eje por separado (ver Por qué Adam y no SGD)</td>
+<td><code>test_cuadratica_mal_condicionada_sgd_diverge_y_adam_converge</code></td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 2.</strong> Propiedades de Adam y la prueba que respalda cada una. <em>Fuente:</em> elaboración propia;
+<code>src/models/optim.py</code> y <code>tests/test_optim.py</code> (7 pruebas, todas pasan).</p>
+<p>La invariancia a la escala da una lectura práctica de $\eta$: con Adam es, aproximadamente, cuánto se
+mueve como máximo cada parámetro por paso, sin importar en qué unidades esté la pérdida.</p>
+<h3>Por qué Adam y no SGD</h3>
+<p>En la función $f(x, y) = \tfrac12 (100x^2 + y^2)$, la curvatura en $x$ es 100 veces la de $y$. SGD hace en
+la dirección $x$ la actualización $x \leftarrow (1 - 100\eta)\,x$, que solo converge si
+$\lvert 1 - 100\eta\rvert &lt; 1$, es decir, si $\eta &lt; 2/100 = 0{,}02$. Con un $\eta$ tan pequeño, la
+dirección $y$ avanza muy despacio. Con $\eta = 0{,}025$, SGD diverge y Adam converge a menos de $10^{-6}$
+(Tabla 2). Las redes de este trabajo tienen miles de parámetros con escalas de gradiente muy distintas,
+así que ambas usan Adam.</p>
+<h3>L2 y L1: regularización como a priori</h3>
+<p>Una red con 20.993 parámetros puede memorizar el entrenamiento. La regularización añade a la pérdida un
+término que castiga los pesos grandes:</p>
+<div class="eq">$$L_{\text{reg}}(\theta) = L(\theta) + \lambda\,\Omega(\mathbf{w}).$$</div>
+<p><strong>L2.</strong> $\Omega_{L2}(\mathbf{w}) = \tfrac12 \sum_j w_j^2$, con gradiente $\mathbf{w}$. Tiene la misma
+lectura probabilística que las pérdidas por máxima verosimilitud: si a la verosimilitud se le suma una a priori
+gaussiana $w_j \sim \mathcal{N}(0, \tau^2)$, maximizar la probabilidad a posteriori (MAP) equivale a
+minimizar</p>
+<div class="eq">$$-\log p(\mathbf{y}\mid\mathbf{w}) + \sum_j \frac{w_j^2}{2\tau^2}.$$</div>
+<p>Con la pérdida promediada entre los $n$ datos queda $\lambda = 1/(n\tau^2)$: una a priori más estrecha
+es un $\lambda$ mayor. La pérdida sale de la verosimilitud y la regularización, de la a priori. La prueba
+<code>test_l2_encoge_los_pesos</code> lo comprueba: en una logística entrenada con el Adam propio, la norma de los
+pesos baja estrictamente con $\lambda = 0;\ 0{,}01;\ 0{,}1;\ 1$.</p>
+<p>Con SGD, la L2 da $w \leftarrow (1 - \eta\lambda)\, w - \eta g$: el peso se encoge multiplicativamente en
+cada paso. Por eso se le llama también <em>decaimiento de pesos</em> (<em>weight decay</em>). Con Adam, las dos cosas
+dejan de ser iguales (ver L2 con Adam frente a AdamW).</p>
+<p><strong>L1.</strong> $\Omega_{L1}(\mathbf{w}) = \sum_j \lvert w_j\rvert$, con subgradiente $\text{signo}(\mathbf{w})$.
+Corresponde a una a priori de Laplace, $p(w_j) \propto e^{-\lvert w_j\rvert / b}$, con un pico agudo en 0.
+Por eso <strong>produce esparsidad</strong>: el óptimo tiende a caer en puntos donde algunos coeficientes valen
+exactamente 0, y la L1 selecciona variables. En la logística de PD, la L1 con $C = 0{,}01$
+conserva 34 de las 82 variables y pierde solo 0,0004 de AUC.</p>
+<p>Los ceros exactos salen de métodos especializados, como los pasos proximales de <code>saga</code> en scikit-learn.
+<code>saga</code> da un paso de gradiente sobre la pérdida, $u = w - \eta\, g$, y luego aplica el operador proximal
+de la L1, el umbral suave:</p>
+<div class="eq">$$w_j \leftarrow \operatorname{signo}(u_j)\,\max\big(\lvert u_j\rvert - \eta\lambda,\ 0\big).$$</div>
+<p>Todo coeficiente con $\lvert u_j\rvert \le \eta\lambda$ queda exactamente en 0. Si la L1 se suma a la
+pérdida y se entrena con SGD o Adam, no existe ese paso: los pesos irrelevantes oscilan alrededor de 0 y
+casi nunca valen exactamente 0.</p>
+<p><strong>Los sesgos no se penalizan.</strong> El sesgo de salida fija el nivel base (la LGD media es cerca de 0,70).
+Penalizarlo lo empujaría hacia 0, es decir, hacia una predicción de 0,5, sin ninguna razón. La a priori
+"pesos pequeños" tiene sentido para los coeficientes de las variables, no para el nivel base. Por eso
+<code>penalizacion_l1</code> y <code>penalizacion_l2</code> (<code>src/models/losses.py</code>) solo suman sobre los pesos, y la
+logística de scikit-learn tampoco penaliza el intercepto: si lo hiciera, la PD media predicha en
+entrenamiento no coincidiría con la tasa observada, y coincide (ver los resultados de la logística de PD).</p>
+<h3>L2 con Adam frente a AdamW</h3>
+<p><code>torch.optim.Adam(weight_decay=λ)</code> suma $\lambda\mathbf{w}$ al gradiente <strong>antes</strong> de calcular $m_t$ y
+$v_t$. Eso es exactamente minimizar $L + \tfrac{\lambda}{2}\lVert\mathbf{w}\rVert^2$ con Adam. Como el
+término $\lambda\mathbf{w}$ pasa por la división entre $\sqrt{\hat v_t}$, los pesos con gradientes grandes
+reciben menos regularización efectiva.</p>
+<p><strong>AdamW</strong> (Loshchilov y Hutter, 2019) desacopla el decaimiento: aplica
+$\mathbf{w} \leftarrow \mathbf{w} - \eta\lambda\mathbf{w} - \eta\,\hat m_t / (\sqrt{\hat v_t} + \varepsilon)$,
+con el término $\lambda\mathbf{w}$ fuera de los momentos. <strong>No equivale a una L2 en la pérdida.</strong></p>
+<p>La prueba <code>test_weight_decay_de_adam_es_l2_y_adamw_no</code> lo comprueba en un MLP 5→8→1 con $\lambda = 0{,}1$
+durante 30 pasos:</p>
+<ul>
+<li><code>Adam(weight_decay)</code> y Adam sobre <code>bce + 0,1 · penalizacion_l2</code> dan los mismos parámetros en cada paso
+  (diferencia máxima menor que $10^{-16}$, error de redondeo);</li>
+<li>AdamW se separa (diferencia de 0,58).</li>
+</ul>
+<p>Esta distinción importa para este trabajo, porque la red de PD usa <code>weight_decay</code> y la de LGD usa la
+penalización explícita (ver Qué usa cada modelo). Las dos son L2.</p>
+<h3>Dropout</h3>
+<p>Con dropout (Srivastava et al., 2014), en entrenamiento cada neurona oculta se apaga con probabilidad $p$ y las que quedan se reescalan:</p>
+<div class="eq">$$\tilde h_j = \frac{r_j\, h_j}{1-p}, \qquad r_j \sim \text{Bernoulli}(1-p).$$</div>
+<p>El factor $1/(1-p)$ (<em>inverted dropout</em>, el de <code>nn.Dropout</code> de PyTorch) mantiene
+$\mathbb{E}[\tilde h_j] = h_j$, así que al predecir no se apaga nada ni se reescala. La red no puede
+depender de unas pocas neuronas, y el efecto se parece a promediar muchas subredes.</p>
+<p>En la práctica, esto obliga a cambiar de modo: <code>modelo.train()</code> activa el dropout y <code>modelo.eval()</code> lo
+apaga. Si se olvida <code>eval()</code> al validar o predecir, las predicciones salen ruidosas y cambian en cada
+llamada. Por eso <code>entrenar_lgd_mlp</code> y <code>predecir_lgd</code> llaman a <code>eval()</code> antes de evaluar.</p>
+<h3>Parada temprana</h3>
+<p>Después de cada época se mide la pérdida en validación. Si mejora, se guardan los pesos. Si no mejora
+durante <code>patience</code> épocas seguidas, el entrenamiento se detiene y <strong>se restauran los pesos de la mejor
+época</strong>, no los de la última. Regulariza porque limita cuánto crecen y se especializan los pesos.</p>
+<p>Formalmente, sea $\theta_e$ el vector de pesos al terminar la época $e$ y $L_{\text{val}}(e)$ su pérdida
+de validación. Tras cada época se actualiza $e^* = \arg\min_{e' \le e} L_{\text{val}}(e')$ (solo cuenta una
+mejora estricta). El entrenamiento se detiene en la primera época $E$ con $E - e^* \ge \text{patience}$, o
+al llegar al máximo de épocas, y se devuelven $\hat\theta = \theta_{e^*}$ (<code>entrenar_lgd_mlp</code> en
+<code>src/models/lgd_mlp.py</code>).</p>
+<p>En la búsqueda de LGD, 31 de las 36 configuraciones pararon antes del máximo de 100 épocas.
+En promedio entrenaron 46,1 épocas y la mejor fue la 37,1.</p>
+<p>Tiene un costo: la validación se usa para decidir cuándo parar y para elegir la configuración, así que su
+métrica queda algo optimista. Por eso la prueba se reserva para la evaluación final.</p>
+<h3>Qué usa cada modelo</h3>
+<p>La Tabla 3 resume el optimizador y la regularización de la configuración final de cada modelo.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th></th>
+<th>Logística de PD</th>
+<th>MLP de PD</th>
+<th>MLP de LGD</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Optimizador</td>
+<td><code>lbfgs</code> (L2) o <code>saga</code> (L1), scikit-learn</td>
+<td>Adam, lr 0,003</td>
+<td>Adam, lr 0,003</td>
+</tr>
+<tr>
+<td>Lote</td>
+<td>todos los datos</td>
+<td>512</td>
+<td>256</td>
+</tr>
+<tr>
+<td>L2</td>
+<td>$C$ buscado; elegido $C = 0{,}01$</td>
+<td><code>weight_decay</code> = $10^{-4}$, fijo</td>
+<td>penalización explícita, $\lambda = 10^{-5}$ (buscado)</td>
+</tr>
+<tr>
+<td>¿Penaliza los sesgos?</td>
+<td>no</td>
+<td><strong>sí</strong> (<code>weight_decay</code> sobre todos los parámetros)</td>
+<td>no</td>
+</tr>
+<tr>
+<td>L1</td>
+<td>buscada; no elegida</td>
+<td>no</td>
+<td>disponible; no usada</td>
+</tr>
+<tr>
+<td>Dropout</td>
+<td>—</td>
+<td>0 (buscado entre 0; 0,2 y 0,3)</td>
+<td>0,1 (buscado)</td>
+</tr>
+<tr>
+<td>Parada temprana</td>
+<td>— (converge por tolerancia)</td>
+<td>paciencia 5, máximo 30 épocas</td>
+<td>paciencia 10, máximo 100 épocas</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 3.</strong> Optimizador y regularización de la configuración final de cada modelo. <em>Fuente:</em>
+elaboración propia; <code>configs/pd_logreg.yaml</code>, <code>configs/pd_mlp.yaml</code>, <code>configs/lgd_mlp.yaml</code>,
+<code>src/models/pd_mlp.py</code>, <code>src/models/lgd_mlp.py</code> y <code>src/search/pd_random_search.py</code>.</p>
+<p>Las dos redes regularizan los sesgos de forma distinta. Con $\lambda = 10^{-4}$ el efecto sobre los sesgos
+de la red de PD probablemente es pequeño, pero no se midió.</p>
+<p>Un detalle de la red de LGD: la pérdida de entrenamiento que se guarda en el historial incluye la
+penalización L2, y la de validación no. Con los pesos finales de la semilla 0, ese término vale
+$10^{-5} \times 175{,}2 = 0{,}0018$. Hay que tenerlo en cuenta al comparar las curvas de entrenamiento y validación de la red de LGD.</p>
+<h3>Qué dicen los datos sobre la regularización</h3>
+<p>La Tabla 4 agrupa los 36 entrenamientos de la búsqueda de LGD según su L2 y su dropout.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Hiperparámetro</th>
+<th>Valor</th>
+<th>Entrenamientos</th>
+<th>Mediana del RMSE</th>
+<th>Mínimo del RMSE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L2 ($\lambda$)</td>
+<td>0</td>
+<td>12</td>
+<td>0,17900</td>
+<td>0,17833</td>
+</tr>
+<tr>
+<td></td>
+<td>$10^{-5}$</td>
+<td>12</td>
+<td>0,17941</td>
+<td><strong>0,17735</strong></td>
+</tr>
+<tr>
+<td></td>
+<td>$10^{-4}$</td>
+<td>9</td>
+<td>0,18009</td>
+<td>0,17756</td>
+</tr>
+<tr>
+<td></td>
+<td>$10^{-3}$</td>
+<td>3</td>
+<td>0,18079</td>
+<td>0,18075</td>
+</tr>
+<tr>
+<td>Dropout</td>
+<td>0</td>
+<td>12</td>
+<td>0,17917</td>
+<td>0,17756</td>
+</tr>
+<tr>
+<td></td>
+<td>0,1</td>
+<td>9</td>
+<td>0,17991</td>
+<td><strong>0,17735</strong></td>
+</tr>
+<tr>
+<td></td>
+<td>0,2</td>
+<td>6</td>
+<td>0,17899</td>
+<td>0,17842</td>
+</tr>
+<tr>
+<td></td>
+<td>0,3</td>
+<td>9</td>
+<td>0,18079</td>
+<td>0,17833</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 4.</strong> RMSE en validación de la búsqueda de LGD según la L2 y el dropout (36 entrenamientos:
+12 configuraciones × 3 pérdidas). <em>Fuente:</em> elaboración propia; <code>results/tables/lgd_busqueda.csv</code>.</p>
+<ul>
+<li><strong>La mediana empeora a medida que crece la L2.</strong> Es un indicio de que, con 41.173 créditos y una red de
+  20.993 parámetros, el sobreajuste no es el problema principal. La parada temprana ya lo controla.</li>
+<li><strong>El dropout no muestra un patrón claro.</strong></li>
+<li><strong>Esta tabla no aísla el efecto de cada hiperparámetro.</strong> Con 12 configuraciones aleatorias los
+  hiperparámetros están mezclados (por ejemplo, $\lambda = 10^{-3}$ aparece en una sola configuración), y
+  cada nivel incluye las tres pérdidas. Medir el efecto de cada uno exigiría variarlo con los demás fijos.</li>
+</ul>
+<p>La logística de PD apunta a lo mismo: con 163.541 créditos y 83 parámetros, toda la rejilla de L2 con
+$C \geq 0{,}003$ da la BCE de validación entre 0,54246 y 0,54263.</p>
+<h3>Limitaciones</h3>
+<ul>
+<li>La comparación entre SGD y Adam se hizo en problemas de juguete (una logística y una cuadrática), no en
+  las redes del trabajo. Las redes se entrenaron solo con Adam.</li>
+<li>No se buscaron $\beta_1$, $\beta_2$ ni $\varepsilon$; se usaron los valores por defecto.</li>
+<li>No se usó AdamW. Su diferencia con la L2 se mostró en una prueba, no en los modelos finales.</li>
+<li>El efecto de la L2 y del dropout en los datos reales es solo un indicio (ver Qué dicen los datos sobre la regularización).</li>
+</ul>
+</div>
+</details>
+<!-- teoria:fin -->
+        </section>
+        <section class="wrap section" id="detalle">
+            <div class="section-head">
+                <div>
+                    <div class="eyebrow">Resultados del reporte</div>
+                    <h2>Resultados en detalle</h2>
+                </div>
+                <p>Búsquedas, semillas, calibración y limitaciones de cada modelo. Despliega un tema para leerlo.</p>
+            </div>
+<!-- resultados:inicio -->
+<details class="teoria" id="resultados-logistica">
+<summary><span>Regresión logística de referencia para PD</span><small>Juan David Robayo</small></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección presenta el modelo de referencia contra el que se compara la red de PD: una
+regresión logística estimada por máxima verosimilitud, con una búsqueda de regularización L1 y L2 con
+presupuesto declarado. Usa la <strong>partición temporal</strong> de PD, la misma de la red: entrenamiento 2007–2013
+($n = 163.541$, tasa de incumplimiento 19,28 %), validación 2014 ($n = 74.154$, 26,22 %) y prueba 2015
+($n = 30.835$, 25,46 %), con 82 variables (sección «Variables objetivo»). </p>
+</blockquote>
+<hr />
+<h3>Modelo</h3>
+<p>La logística supone que el incumplimiento de cada crédito es una Bernoulli con probabilidad
+$p_i = \sigma(b + \mathbf{w}^\top \mathbf{x}_i)$. Maximizar su verosimilitud equivale a minimizar la
+entropía cruzada binaria (BCE), como se deriva en la sección «Funciones de pérdida por máxima verosimilitud» (apartado «Bernoulli → entropía cruzada binaria (BCE): PD»). A esa pérdida se le suma
+una penalización sobre los coeficientes $\mathbf{w}$, L2 ($\lVert\mathbf{w}\rVert_2^2$) o L1
+($\lVert\mathbf{w}\rVert_1$), cuyo efecto se explica en la sección «Optimizador y regularización».</p>
+<p>Se usó <code>LogisticRegression</code> de scikit-learn (Pedregosa et al., 2011), que parametriza la fuerza de la penalización con
+$C$: un $C$ pequeño es una penalización fuerte, y $C = \infty$ es la logística sin penalizar. En la
+configuración del proyecto se anota la equivalencia $\lambda = 1/(nC)$ con la pérdida promedio. La L2 se
+ajustó con <code>lbfgs</code> y la L1 con <code>saga</code>, porque <code>lbfgs</code> no admite L1. <code>saga</code> hace pasos proximales, y por
+eso la L1 deja coeficientes exactamente en cero.</p>
+<h3>Búsqueda y presupuesto</h3>
+<p>La Tabla 5 resume el espacio de búsqueda y el presupuesto.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Elemento</th>
+<th>Valor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rejilla de $C$</td>
+<td>13 valores en escala logarítmica entre $10^{-4}$ y $10^{2}$</td>
+</tr>
+<tr>
+<td>Penalización</td>
+<td>L2 (<code>lbfgs</code>) y L1 (<code>saga</code>)</td>
+</tr>
+<tr>
+<td>Referencia sin penalizar</td>
+<td>$C = \infty$</td>
+</tr>
+<tr>
+<td>Configuraciones entrenadas</td>
+<td>27 (13 × 2 + 1), una vez cada una</td>
+</tr>
+<tr>
+<td>Tiempo total</td>
+<td>5,1 min (L2: 0,2 min; L1: 4,9 min)</td>
+</tr>
+<tr>
+<td>Parámetros</td>
+<td>83 (82 coeficientes y el intercepto)</td>
+</tr>
+<tr>
+<td>Criterio de selección</td>
+<td>menor BCE en la validación temporal (el mismo de la red de PD)</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 5.</strong> Espacio de búsqueda y presupuesto de la logística. <em>Fuente:</em> elaboración propia;
+<code>configs/pd_logreg.yaml</code>, <code>src/models/pd_logreg.py</code> y <code>results/tables/pd_logreg_busqueda.csv</code>.</p>
+<p>La regresión logística no depende de la semilla con <code>lbfgs</code>, así que se entrena una sola vez y no
+necesita 30 semillas: la regla de las 30 semillas del enunciado es para las redes.</p>
+<h3>Resultados de la búsqueda</h3>
+<p>La Tabla 6 muestra una selección de las 27 configuraciones: las mejores con L2, la logística sin
+penalizar y el camino de la L1.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Penalización</th>
+<th>$C$</th>
+<th>BCE validación</th>
+<th>AUC validación</th>
+<th>Brier</th>
+<th>Coeficientes distintos de 0</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>L2 (elegida)</strong></td>
+<td><strong>0,01</strong></td>
+<td><strong>0,54246</strong></td>
+<td><strong>0,68296</strong></td>
+<td><strong>0,18024</strong></td>
+<td>81</td>
+</tr>
+<tr>
+<td>L2</td>
+<td>0,316</td>
+<td>0,54248</td>
+<td>0,68279</td>
+<td>0,18019</td>
+<td>81</td>
+</tr>
+<tr>
+<td>Sin penalizar</td>
+<td>$\infty$</td>
+<td>0,54252</td>
+<td>0,68278</td>
+<td>0,18020</td>
+<td>81</td>
+</tr>
+<tr>
+<td>L2</td>
+<td>$10^{-4}$</td>
+<td>0,55074</td>
+<td>0,68018</td>
+<td>0,18461</td>
+<td>81</td>
+</tr>
+<tr>
+<td>L1</td>
+<td>0,1</td>
+<td>0,54255</td>
+<td>0,68280</td>
+<td>0,18024</td>
+<td>76</td>
+</tr>
+<tr>
+<td>L1</td>
+<td>0,01</td>
+<td>0,54312</td>
+<td>0,68255</td>
+<td>0,18078</td>
+<td>34</td>
+</tr>
+<tr>
+<td>L1</td>
+<td>0,001</td>
+<td>0,55308</td>
+<td>0,66919</td>
+<td>0,18499</td>
+<td>12</td>
+</tr>
+<tr>
+<td>L1</td>
+<td>$10^{-4}$</td>
+<td>0,58960</td>
+<td>0,50000</td>
+<td>0,19825</td>
+<td>0</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 6.</strong> Filas seleccionadas de la búsqueda (validación temporal 2014). <em>Fuente:</em> elaboración
+propia; <code>results/tables/pd_logreg_busqueda.csv</code> (las 27 filas).</p>
+<ul>
+<li><strong>La regularización casi no cambia el resultado.</strong> Para todo $C \geq 0{,}003$ con L2, la BCE de
+  validación está entre 0,54246 y 0,54263, y la logística sin penalizar queda a $6\times10^{-5}$ de la
+  elegida. Es lo esperable con 163.541 créditos para 83 parámetros: los datos dominan la penalización.
+  Las diferencias del orden de $10^{-5}$ ni siquiera son monótonas en $C$ (por ejemplo, $C = 1$ da
+  0,54257, peor que sus vecinos). <em>Hipótesis:</em> están dentro de la tolerancia del optimizador
+  ($10^{-4}$) y no deben leerse como una preferencia real por $C = 0{,}01$.</li>
+<li><strong>Aun así, la penalización resuelve un problema de identificación.</strong> Las dos columnas de <code>term</code>
+  (36 y 60 meses) suman 1 en cada crédito, igual que la columna implícita del intercepto. Además, hay tres
+  columnas constantes en entrenamiento: <code>policy_code</code>, <code>earliest_cr_line_infrequent_sklearn</code> y
+  <code>application_type_INDIVIDUAL</code>. Sin penalización, los coeficientes de esas columnas no son únicos: muchas
+  combinaciones dan las mismas predicciones. La L2 elige la de menor norma, y se ve en el modelo guardado:
+  las dos columnas que valen 1 en todo el entrenamiento se reparten el papel del intercepto con −0,163 cada una, y
+  <code>policy_code</code> queda en 0. Por eso se reportan 81 coeficientes distintos de cero y no 82.</li>
+<li><strong>La L1 ofrece un modelo mucho más pequeño a bajo costo.</strong> Con $C = 0{,}01$ conserva 34 de las 82
+  variables y pierde solo 0,0004 de AUC. Con 12 variables pierde 0,014. Es una opción si se quisiera una
+  scorecard con pocas variables, pero no se eligió porque el criterio prerregistrado es la BCE.</li>
+<li><strong>La L1 es mucho más lenta</strong>: 4,9 minutos frente a 0,2 de toda la L2, porque <code>saga</code> es un método
+  estocástico y necesita muchas pasadas sobre los datos para converger.</li>
+</ul>
+<h3>Calibración global y cambio de época</h3>
+<p>La logística estimada por máxima verosimilitud cumple una propiedad exacta. Si el intercepto no se
+penaliza, la derivada de la pérdida respecto de $b$ es $\sum_i (p_i - y_i)$, y en el óptimo vale cero:
+<strong>la PD media predicha en entrenamiento es igual a la tasa de incumplimiento de entrenamiento</strong>. El
+modelo guardado lo cumple (Tabla 7). La diferencia es de $5\times10^{-5}$, compatible con la
+tolerancia del optimizador.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Partición</th>
+<th>PD media predicha</th>
+<th>Tasa observada</th>
+<th>Diferencia</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Entrenamiento (2007–2013)</td>
+<td>0,1928</td>
+<td>0,1928</td>
+<td>0,0000</td>
+</tr>
+<tr>
+<td>Validación (2014)</td>
+<td>0,2151</td>
+<td>0,2622</td>
+<td>−0,0471</td>
+</tr>
+<tr>
+<td>Prueba (2015)</td>
+<td>0,2214</td>
+<td>0,2546</td>
+<td>−0,0332</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 7.</strong> PD media predicha por la logística elegida frente a la tasa de incumplimiento observada.
+<em>Fuente:</em> elaboración propia; <code>models/pd_logreg.joblib</code> aplicado a la partición temporal de PD.</p>
+<p>La logística <strong>subestima la PD en 2014 y 2015</strong>, pero no es un error del ajuste. El modelo reproduce la
+tasa del periodo en que se entrenó, y la tasa observada sube en los años siguientes. Parte de esa subida
+se debe a la censura por derecha de los créditos recientes (sección «Variables objetivo»): de las cohortes de 2014 y 2015
+se observan sobre todo los créditos que ya se resolvieron, y entre ellos pesan más los incumplimientos
+tempranos. La red de PD tiene el mismo problema, aunque más leve (PD media de 0,239 en validación).</p>
+<p><strong>Recalibración de Platt.</strong> Un desplazamiento como este se corrige con una recalibración ajustada <strong>solo
+en validación</strong>. La de Platt (2000) reestima un intercepto $a$ y una pendiente $b$ sobre el logit de la PD:</p>
+<div class="eq">$$p' = \sigma\big(a + b\,\text{logit}(p)\big).$$</div>
+<p>Es una logística de una sola variable, sin penalizar, ajustada por máxima verosimilitud en la validación</p>
+<ol>
+<li>Dio $a = 0{,}193$ y $b = 0{,}925$. La Tabla 8 compara la PD original y la recalibrada.</li>
+</ol>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Partición</th>
+<th>PD</th>
+<th>PD media</th>
+<th>Tasa observada</th>
+<th>BCE</th>
+<th>Brier</th>
+<th>AUC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Validación 2014</td>
+<td>original</td>
+<td>0,2151</td>
+<td>0,2622</td>
+<td>0,5425</td>
+<td>0,1802</td>
+<td>0,6830</td>
+</tr>
+<tr>
+<td>Validación 2014</td>
+<td>Platt</td>
+<td>0,2622</td>
+<td>0,2622</td>
+<td>0,5351</td>
+<td>0,1779</td>
+<td>0,6830</td>
+</tr>
+<tr>
+<td>Prueba 2015</td>
+<td>original</td>
+<td>0,2214</td>
+<td>0,2546</td>
+<td>0,5382</td>
+<td>0,1781</td>
+<td>0,6738</td>
+</tr>
+<tr>
+<td>Prueba 2015</td>
+<td>Platt</td>
+<td>0,2684</td>
+<td>0,2546</td>
+<td>0,5338</td>
+<td>0,1771</td>
+<td>0,6738</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 8.</strong> PD original y recalibrada con Platt (ajustado en validación 2014). La BCE se calcula con
+<code>src/evaluation/metrics.py</code> (apartado «Problemas de datos encontrados»). <em>Fuente:</em> elaboración propia;
+<code>python -m src.models.pd_logreg --recalibrar</code>, <code>results/tables/pd_logreg_platt.csv</code>.</p>
+<ul>
+<li><strong>En prueba 2015 la calibración mejora.</strong> El error de la PD media pasa de −0,033 a +0,014, y bajan la
+  BCE (de 0,5382 a 0,5338) y el Brier (de 0,1781 a 0,1771).</li>
+<li><strong>La AUC no cambia.</strong> Con $b &gt; 0$ la transformación es creciente y no altera el orden de los créditos.
+  La discriminación del modelo sigue siendo la misma; solo cambia el nivel de la PD.</li>
+<li><strong>En 2015 Platt se pasa.</strong> Aprende el nivel de 2014 (26,2 %), y la tasa de 2015 es algo menor (25,5 %).
+  Una recalibración fija en un año no corrige un nivel que sigue cambiando de un año a otro.</li>
+<li><strong>$b = 0{,}925 &lt; 1$</strong>: en 2014 la logística original era algo sobreconfiada (sus logits se dispersaban de
+  más) y Platt los comprime un poco.</li>
+<li><strong>Las cifras de validación con Platt son optimistas</strong>, porque se ajustó con esos mismos datos. Por la
+  misma propiedad del intercepto de arriba, su PD media iguala exactamente la tasa de 2014. La cifra
+  honesta es la de prueba.</li>
+</ul>
+<h3>Frente a la red de PD</h3>
+<p>La Tabla 9 compara la logística con la red de PD en presupuesto, complejidad y métricas, con la PD
+original (sin Platt), que es la que se evaluó en prueba.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th></th>
+<th>Logística</th>
+<th>MLP [64, 32] ReLU</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Configuraciones de búsqueda</td>
+<td>27</td>
+<td>12</td>
+</tr>
+<tr>
+<td>Entrenamientos totales</td>
+<td>27</td>
+<td>63</td>
+</tr>
+<tr>
+<td>Minutos</td>
+<td>5,1</td>
+<td>69,4</td>
+</tr>
+<tr>
+<td>Parámetros entrenables</td>
+<td>83</td>
+<td>7.425</td>
+</tr>
+<tr>
+<td>AUC validación</td>
+<td>0,6830</td>
+<td>0,6900 ± 0,0025 (30 semillas)</td>
+</tr>
+<tr>
+<td>AUC validación: peor y mejor semilla</td>
+<td>—</td>
+<td>0,6818 y 0,6950</td>
+</tr>
+<tr>
+<td>AUC prueba 2015</td>
+<td>0,6738</td>
+<td>0,6834</td>
+</tr>
+<tr>
+<td>Gini prueba 2015</td>
+<td>0,348</td>
+<td>0,367</td>
+</tr>
+<tr>
+<td>KS prueba 2015</td>
+<td>0,257</td>
+<td>0,268</td>
+</tr>
+<tr>
+<td>Brier prueba 2015</td>
+<td>0,1781</td>
+<td>0,1751</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 9.</strong> Logística de referencia frente a la red de PD. En prueba se evaluó una sola semilla de la
+red. <em>Fuente:</em> elaboración propia; <code>results/tables/p4_comparacion_justa_pd.csv</code>;
+minutos de la logística de <code>results/tables/pd_logreg_busqueda.csv</code>.</p>
+<ul>
+<li>La red mejora a la logística en todas las métricas de prueba, pero por poco: <strong>0,010 de AUC</strong> y
+  0,003 de Brier.</li>
+<li><strong>No todas las semillas de la red superan a la logística.</strong> La peor semilla (0,6818) queda por debajo
+  de la logística (0,6830) en validación, así que la ventaja de la red depende en parte de la
+  inicialización.</li>
+<li>El costo de la red es 90 veces más parámetros y unas 14 veces más tiempo de búsqueda. Los tiempos se
+  midieron en corridas y máquinas distintas (la misma búsqueda de la logística tardó 12,6 min en una
+  corrida anterior), así que solo indican el orden de magnitud. La logística,
+  además, se puede leer directamente como scorecard (sección «Scorecard»).</li>
+</ul>
+<h3>Coeficientes</h3>
+<p>La Tabla 10 muestra los 10 coeficientes de mayor valor absoluto de la logística elegida.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Coeficiente</th>
+<th>Tipo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>purpose_small_business</code></td>
+<td>+0,554</td>
+<td>indicadora (0/1)</td>
+</tr>
+<tr>
+<td><code>term_ 36 months</code></td>
+<td>−0,535</td>
+<td>indicadora (0/1)</td>
+</tr>
+<tr>
+<td><code>funded_amnt</code></td>
+<td>+0,413</td>
+<td>numérica estandarizada</td>
+</tr>
+<tr>
+<td><code>emp_length_missing</code></td>
+<td>+0,387</td>
+<td>indicadora (0/1)</td>
+</tr>
+<tr>
+<td><code>term_ 60 months</code></td>
+<td>+0,372</td>
+<td>indicadora (0/1)</td>
+</tr>
+<tr>
+<td><code>annual_inc</code></td>
+<td>−0,351</td>
+<td>numérica estandarizada</td>
+</tr>
+<tr>
+<td><code>funded_amnt_inv</code></td>
+<td>−0,311</td>
+<td>numérica estandarizada</td>
+</tr>
+<tr>
+<td><code>purpose_credit_card</code></td>
+<td>−0,288</td>
+<td>indicadora (0/1)</td>
+</tr>
+<tr>
+<td><code>purpose_car</code></td>
+<td>−0,280</td>
+<td>indicadora (0/1)</td>
+</tr>
+<tr>
+<td><code>revol_util</code></td>
+<td>+0,247</td>
+<td>numérica estandarizada</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 10.</strong> Los 10 coeficientes de mayor valor absoluto de la logística elegida (un coeficiente
+positivo sube el logit de la PD). Intercepto: −0,322. <em>Fuente:</em> elaboración propia;
+<code>models/pd_logreg.joblib</code>.</p>
+<p>Los coeficientes no deben leerse uno a uno como "efecto de la variable", por tres razones:</p>
+<ul>
+<li><strong>Escalas distintas.</strong> Las numéricas están estandarizadas (el coeficiente es el cambio del logit por una
+  desviación estándar) y las indicadoras no (el cambio es por pasar de 0 a 1). Sus magnitudes no son
+  comparables entre sí.</li>
+<li><strong>Colinealidad.</strong> <code>funded_amnt</code> (+0,41) y <code>funded_amnt_inv</code> (−0,31) son casi la misma cantidad, y sus
+  signos opuestos se compensan. El efecto conjunto del monto es mucho menor que cualquiera de los dos.
+  Lo mismo pasa con las dos columnas de <code>term</code>: solo importa su diferencia (0,91 a favor de 60 meses).</li>
+<li><strong>No identificación</strong> de las columnas redundantes (apartado «Resultados de la búsqueda»).</li>
+</ul>
+<p>La interpretación por variable se hace con los puntos de la scorecard y la importancia por permutación
+(secciones 3.7 y 5.6).</p>
+<h3>Problemas de datos encontrados</h3>
+<p>Estos problemas vienen del preprocesamiento (sección «Variables objetivo») y afectan a todos los modelos de PD:</p>
+<ul>
+<li><strong>Tres columnas constantes en entrenamiento</strong> (apartado «Resultados de la búsqueda»). No aportan información, inflan el conteo de
+  parámetros y crean redundancia con el intercepto. Además, dos de ellas valen 1 en todo el
+  entrenamiento pero no en las otras particiones: <code>earliest_cr_line_infrequent_sklearn</code> vale 0 en 377
+  créditos de validación y 560 de prueba, y <code>application_type_INDIVIDUAL</code> en 3 de prueba. Para esos
+  créditos, el coeficiente de −0,163, que en entrenamiento era solo una parte del intercepto, sube el
+  logit en 0,163 sin que el modelo haya aprendido nada sobre ellos.</li>
+<li><strong>Valores extremos sin tratar.</strong> En validación, <code>tot_coll_amt</code> llega a 13.329 desviaciones estándar,
+  cuando su máximo en entrenamiento es 109, y ese crédito recibe una PD de 1,0. En prueba, un crédito que
+  incumplió recibe una PD de $9\times10^{-25}$. Sus términos dominan cualquier recorte, así que <strong>la BCE
+  depende del épsilon con que se recorte la probabilidad</strong>: con <code>src/evaluation/metrics.py</code> (épsilon de
+  float64), la de esta sección, da 0,54246 en validación y 0,53823 en prueba; con <code>log_loss</code> de
+  scikit-learn sobre float32, como se calculaba antes, daba 0,54219 y 0,53758. El orden de los modelos y la
+  elección no cambian, y la AUC tampoco, porque solo depende del orden.</li>
+</ul>
+<h3>Limitaciones</h3>
+<ul>
+<li><strong>La selección se hizo con un solo criterio (BCE)</strong>, y las diferencias entre las mejores
+  configuraciones son menores que la tolerancia del optimizador. Cualquier $C \geq 0{,}003$ con L2 habría
+  dado prácticamente el mismo modelo.</li>
+<li><strong>No se probó una logística con transformaciones de variables</strong> (logaritmos o cortes) ni con
+  interacciones. Un modelo así sería una referencia más fuerte frente a la red.</li>
+<li><strong>La calibración temporal se corrige solo en parte.</strong> Platt (apartado «Calibración global y cambio de época») acerca la PD media de 2015 a
+  la tasa real, pero se pasa, porque la tasa vuelve a cambiar de un año a otro. No se probó la
+  recalibración isotónica.</li>
+<li><strong>Los valores extremos</strong> (apartado «Problemas de datos encontrados») no se trataron.</li>
+</ul>
+</div>
+</details>
+<details class="teoria" id="resultados-lgd">
+<summary><span>Red neuronal de LGD</span><small>Juan David Robayo</small></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección reporta la construcción y la selección del MLP de LGD. El criterio de selección y cuatro
+predicciones se fijaron antes de entrenar (sección «Funciones de pérdida por máxima verosimilitud», apartados «Criterio de selección (fijado antes de entrenar)» y «Predicciones escritas antes de entrenar»); aquí se aplican y se
+contrastan. Todo se mide en la <strong>validación de la partición aleatoria</strong> ($n = 8.823$; entrenamiento
+$n = 41.173$, 82 variables, <code>split_seed: 90</code>). El conjunto de prueba no interviene: se reserva para la
+evaluación final. La partición temporal se reporta solo como análisis de estabilidad
+(apartado «Estabilidad temporal»).</p>
+</blockquote>
+<hr />
+<h3>Búsqueda con presupuesto declarado</h3>
+<p>La búsqueda fue aleatoria y <strong>pareada</strong>: se muestrearon 12 configuraciones del espacio de la Tabla 11
+(semilla 90) y cada una se entrenó con las tres pérdidas candidatas (MSE, BCE fraccional y Beta), en
+total <strong>36 entrenamientos y 24,4 minutos</strong>. Todas usan Adam (sección «Optimizador y regularización»), hasta 100 épocas, parada
+temprana con paciencia 10 sobre la pérdida de validación, lotes de 256 y salida sigmoide (sección «Funciones de pérdida por máxima verosimilitud»,
+apartado «Activación de salida: sigmoide»). Al parear, las tres pérdidas reciben exactamente las mismas arquitecturas y el mismo
+presupuesto, así que la comparación entre ellas no depende de cuál tuvo más suerte en el muestreo.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Hiperparámetro</th>
+<th>Valores posibles</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Capas ocultas</td>
+<td>[32], [64], [64, 32], [128, 64], [128, 64, 32]</td>
+</tr>
+<tr>
+<td>Activación oculta</td>
+<td>ReLU, tanh</td>
+</tr>
+<tr>
+<td>Dropout</td>
+<td>0; 0,1; 0,2; 0,3</td>
+</tr>
+<tr>
+<td>Tasa de aprendizaje</td>
+<td>$3\times10^{-4}$, $10^{-3}$, $3\times10^{-3}$</td>
+</tr>
+<tr>
+<td>Penalización L2</td>
+<td>0, $10^{-5}$, $10^{-4}$, $10^{-3}$</td>
+</tr>
+<tr>
+<td>Pérdida</td>
+<td>MSE, BCE fraccional, Beta</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 11.</strong> Espacio de búsqueda del MLP de LGD. <em>Fuente:</em> elaboración propia; <code>ESPACIO</code> y
+<code>PERDIDAS</code> en <code>src/search/lgd_random_search.py</code>.</p>
+<p>La Tabla 12 muestra la mejor configuración de cada pérdida y la mejor con ReLU.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Config.</th>
+<th>Pérdida</th>
+<th>Capas</th>
+<th>Activación</th>
+<th>Dropout</th>
+<th>lr</th>
+<th>L2</th>
+<th>RMSE</th>
+<th>$R^2$</th>
+<th>sd predicha</th>
+<th>Épocas</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>9</td>
+<td>BCE</td>
+<td>[128, 64, 32]</td>
+<td>tanh</td>
+<td>0,1</td>
+<td>0,003</td>
+<td>$10^{-5}$</td>
+<td>0,17735</td>
+<td>0,230</td>
+<td>0,1014</td>
+<td>40</td>
+</tr>
+<tr>
+<td>9</td>
+<td>MSE</td>
+<td>[128, 64, 32]</td>
+<td>tanh</td>
+<td>0,1</td>
+<td>0,003</td>
+<td>$10^{-5}$</td>
+<td>0,17735</td>
+<td>0,230</td>
+<td>0,0948</td>
+<td>53</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Beta</td>
+<td>[128, 64, 32]</td>
+<td>tanh</td>
+<td>0,1</td>
+<td>0,003</td>
+<td>$10^{-5}$</td>
+<td>0,17991</td>
+<td>0,208</td>
+<td>0,0876</td>
+<td>34</td>
+</tr>
+<tr>
+<td>5</td>
+<td>MSE</td>
+<td>[128, 64]</td>
+<td>ReLU</td>
+<td>0</td>
+<td>0,001</td>
+<td>$10^{-4}$</td>
+<td>0,17756</td>
+<td>0,228</td>
+<td>0,1024</td>
+<td>34</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 12.</strong> Mejor configuración por pérdida en la búsqueda (una semilla, validación aleatoria).
+<em>Fuente:</em> elaboración propia; <code>results/tables/lgd_busqueda.csv</code>.</p>
+<ul>
+<li><strong>Las tres pérdidas eligen la misma configuración (la 9).</strong> La diferencia que queda entre ellas se
+  debe a la pérdida y no a la arquitectura.</li>
+<li><strong>La tanh gana en la mejor configuración, pero no en general.</strong> La mediana del RMSE es 0,17925 con ReLU
+  y 0,18000 con tanh (18 entrenamientos cada una). No se puede afirmar que la tanh sea mejor activación
+  para este problema; solo que la mejor configuración la usa. El apartado «El techo de la tanh» vuelve sobre esto.</li>
+<li><strong>MSE y BCE quedan empatadas</strong> en la búsqueda: el RMSE coincide hasta la quinta cifra decimal.</li>
+</ul>
+<h3>Treinta semillas</h3>
+<p>La configuración 9 se reentrenó con las semillas 0 a 29 para cada pérdida (Tabla 13). La regresión
+lineal de referencia es determinista y se entrena una sola vez.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Modelo</th>
+<th>RMSE (media ± sd)</th>
+<th>Mejor</th>
+<th>Peor</th>
+<th>MAE</th>
+<th>$R^2$</th>
+<th>sd predicha</th>
+<th>Parámetros</th>
+<th>Minutos (30 semillas)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MLP BCE</td>
+<td>0,17728 ± 0,00019</td>
+<td>0,17695</td>
+<td>0,17765</td>
+<td>0,1370</td>
+<td>0,231</td>
+<td>0,0973</td>
+<td>20.993</td>
+<td>31,9</td>
+</tr>
+<tr>
+<td>MLP MSE</td>
+<td>0,17741 ± 0,00022</td>
+<td>0,17696</td>
+<td>0,17784</td>
+<td>0,1373</td>
+<td>0,230</td>
+<td>0,0960</td>
+<td>20.993</td>
+<td>26,4</td>
+</tr>
+<tr>
+<td>MLP Beta</td>
+<td>0,17992 ± 0,00039</td>
+<td>0,17930</td>
+<td>0,18086</td>
+<td>0,1404</td>
+<td>0,208</td>
+<td>0,0869</td>
+<td>20.994</td>
+<td>17,9</td>
+</tr>
+<tr>
+<td>Lineal</td>
+<td>0,18166</td>
+<td>—</td>
+<td>—</td>
+<td>0,1404</td>
+<td>0,192</td>
+<td>0,0877</td>
+<td>83</td>
+<td>&lt; 0,1</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 13.</strong> Configuración 9 con 30 semillas en la validación aleatoria. La sd predicha es la
+desviación estándar de las predicciones (la observada es 0,202). <em>Fuente:</em> elaboración propia;
+<code>results/tables/lgd_semillas_resumen.csv</code> y <code>lgd_semillas_{bce,mse,beta}.csv</code>.</p>
+<ul>
+<li><strong>La red mejora a la lineal en todas las semillas.</strong> La peor semilla de la BCE (0,17765) está por debajo
+  de la lineal (0,18166). La mejora es pequeña: <strong>2,4 % de RMSE</strong> y de 0,192 a 0,231 de $R^2$, a cambio
+  de 253 veces más parámetros y unos 64 segundos de entrenamiento por semilla.</li>
+<li><strong>La variabilidad entre semillas es pequeña</strong> frente a las diferencias entre pérdidas, salvo entre BCE
+  y MSE (apartado «Empate y desempate»).</li>
+<li><strong>Presupuesto total de la familia.</strong> La búsqueda (36 entrenamientos, 24,4 min) y las 30 semillas de
+  cada pérdida (90 entrenamientos, 76,2 min) suman 126 entrenamientos y 100,6 minutos, sin contar los
+  diagnósticos (5 con ReLU, 4 de $\varepsilon$ y 5 temporales). La lineal se ajustó una sola vez, en menos
+  de 0,1 minutos: la ventaja de la red se obtuvo con 36 configuraciones frente a 1.</li>
+</ul>
+<h3>Empate y desempate</h3>
+<p>El criterio prerregistrado (sección «Funciones de pérdida por máxima verosimilitud», apartado «Criterio de selección (fijado antes de entrenar)») elige por RMSE en validación y, si hay empate,
+desempata con la distribución de las predicciones. Una primera versión del trabajo eligió la MSE por el
+RMSE de la búsqueda sin aplicar ese desempate; aquí se corrige.</p>
+<ul>
+<li><strong>Empate.</strong> La diferencia media de RMSE entre BCE y MSE en las 30 semillas es $1{,}2\times10^{-4}$,
+  por debajo de la tolerancia de $2{,}5\times10^{-4}$ (la desviación entre semillas; la tolerancia se
+  fijó después de la primera corrida, como se aclara en la sección «Funciones de pérdida por máxima verosimilitud»).</li>
+<li><strong>Desempate.</strong> Todas las redes encogen las predicciones (apartado «Distribución predicha frente a la observada»), así que se prefiere la de mayor
+  dispersión: en la búsqueda, 0,1014 (BCE) frente a 0,0948 (MSE); en las 30 semillas, 0,0973 frente a
+  0,0960. <strong>Gana la BCE fraccional.</strong> El KS y la distancia de Wasserstein (Tabla 15) apuntan en la misma
+  dirección.</li>
+<li><strong>Comprobación no prerregistrada.</strong> Comparando por semilla, la BCE tiene menor RMSE en 19 de 30 semillas;
+  una prueba $t$ pareada da $t = -2{,}28$, $p = 0{,}03$ (Wilcoxon: $p = 0{,}023$). La diferencia parece
+  sistemática, pero es del 0,07 % del RMSE, sin importancia práctica. Como el RMSE y el desempate eligen
+  la misma pérdida, <strong>la decisión no depende de cómo se fijó la tolerancia</strong>.</li>
+</ul>
+<h3>Contraste de las predicciones prerregistradas</h3>
+<p>La Tabla 14 contrasta cada predicción escrita antes de entrenar con el resultado.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Predicción (sección «Funciones de pérdida por máxima verosimilitud», apartado «Predicciones escritas antes de entrenar»)</th>
+<th>Resultado</th>
+<th>Veredicto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>RMSE parecido entre las tres pérdidas</td>
+<td>Entre 0,1773 y 0,1799: 1,5 % de diferencia máxima</td>
+<td>Se cumple</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Las tres encogen las predicciones (sd muy por debajo de 0,20)</td>
+<td>sd predicha entre 0,087 y 0,097 frente a 0,202 observada</td>
+<td>Se cumple</td>
+</tr>
+<tr>
+<td>3</td>
+<td>La MSE no supera a la BCE; la diferencia se vería en LGD alta</td>
+<td>La MSE no la supera (apartado «Empate y desempate»), pero en el 20 % de LGD más alta el RMSE es igual: 0,1955 (BCE) y 0,1953 (MSE)</td>
+<td>Se cumple el resultado; el mecanismo propuesto no se observa</td>
+</tr>
+<tr>
+<td>4</td>
+<td>La Beta describe mejor la forma de la distribución</td>
+<td>La Beta tiene el peor KS, el peor Wasserstein y la menor dispersión (Tabla 15)</td>
+<td><strong>Refutada</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 14.</strong> Contraste de las predicciones escritas antes de entrenar. <em>Fuente:</em> elaboración propia;
+predicciones de 30 semillas en <code>results/tables/lgd_pred_val_{bce,mse,beta}.csv.gz</code>.</p>
+<p>La predicción 4 falló por una razón que vale la pena explicar. La Beta ajusta mejor la <strong>distribución
+marginal</strong> de la LGD (sección «Funciones de pérdida por máxima verosimilitud», Figura 1), pero lo que se compara aquí es la distribución de las
+<strong>predicciones puntuales</strong> (la media $\mu$ de cada crédito), no la de la distribución predictiva completa.
+Una pérdida que describe bien la forma de $y$ no garantiza que sus medias se dispersen como $y$. Además,
+la Beta subestima la LGD en los deciles altos (apartado «Calibración por deciles»), lo que la encoge todavía más.</p>
+<h3>Distribución predicha frente a la observada</h3>
+<p>El enunciado pide comparar la distribución de las predicciones con la observada. La Tabla 15 resume la
+comparación promediada sobre las 30 semillas, la Tabla 16 da los cuantiles y la Figura 4 muestra
+los histogramas de una semilla.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Modelo</th>
+<th>KS (media ± sd)</th>
+<th>Wasserstein (media ± sd)</th>
+<th>sd predicha / sd observada</th>
+<th>Mín. predicho</th>
+<th>Máx. predicho</th>
+<th>Observadas bajo el mín.</th>
+<th>Observadas sobre el máx.</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MLP BCE</td>
+<td>0,213 ± 0,009</td>
+<td>0,0858 ± 0,0033</td>
+<td>0,48</td>
+<td>0,42</td>
+<td>0,875</td>
+<td>10,8 %</td>
+<td>21,2 %</td>
+</tr>
+<tr>
+<td>MLP MSE</td>
+<td>0,223 ± 0,009</td>
+<td>0,0863 ± 0,0024</td>
+<td>0,47</td>
+<td>0,45</td>
+<td>0,871</td>
+<td>12,8 %</td>
+<td>22,1 %</td>
+</tr>
+<tr>
+<td>MLP Beta</td>
+<td>0,288 ± 0,016</td>
+<td>0,0961 ± 0,0034</td>
+<td>0,43</td>
+<td>0,38</td>
+<td>0,841</td>
+<td>8,7 %</td>
+<td>28,7 %</td>
+</tr>
+<tr>
+<td>Lineal</td>
+<td>0,225</td>
+<td>0,0952</td>
+<td>0,43</td>
+<td>0,46</td>
+<td>1,000</td>
+<td>13,1 %</td>
+<td>0,0 %</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 15.</strong> Distribución de las predicciones frente a la LGD observada en validación (media de 30
+semillas; la lineal es determinista). <em>Fuente:</em> elaboración propia; <code>comparar_distribuciones</code> de
+<code>src/evaluation/distributions.py</code> aplicada a <code>results/tables/lgd_pred_val_{bce,mse,beta}.csv.gz</code> con
+<code>python -m src.search.lgd_random_search --fase distribucion</code>, <code>results/tables/lgd_distribucion_val.csv</code>.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Cuantil</th>
+<th>Observada</th>
+<th>MLP BCE</th>
+<th>MLP MSE</th>
+<th>MLP Beta</th>
+<th>Lineal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1 %</td>
+<td>0,112</td>
+<td>0,499</td>
+<td>0,506</td>
+<td>0,496</td>
+<td>0,560</td>
+</tr>
+<tr>
+<td>10 %</td>
+<td>0,411</td>
+<td>0,585</td>
+<td>0,586</td>
+<td>0,581</td>
+<td>0,601</td>
+</tr>
+<tr>
+<td>25 %</td>
+<td>0,598</td>
+<td>0,631</td>
+<td>0,632</td>
+<td>0,629</td>
+<td>0,631</td>
+</tr>
+<tr>
+<td>50 %</td>
+<td>0,751</td>
+<td>0,697</td>
+<td>0,697</td>
+<td>0,694</td>
+<td>0,697</td>
+</tr>
+<tr>
+<td>75 %</td>
+<td>0,858</td>
+<td>0,787</td>
+<td>0,789</td>
+<td>0,763</td>
+<td>0,769</td>
+</tr>
+<tr>
+<td>90 %</td>
+<td>0,931</td>
+<td>0,848</td>
+<td>0,845</td>
+<td>0,816</td>
+<td>0,834</td>
+</tr>
+<tr>
+<td>99 %</td>
+<td>0,987</td>
+<td>0,873</td>
+<td>0,867</td>
+<td>0,838</td>
+<td>0,903</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 16.</strong> Cuantiles de la LGD observada y predicha en validación (para las redes, promedio de los
+cuantiles de las 30 semillas). <em>Fuente:</em> elaboración propia; mismo comando que la Tabla 15,
+<code>results/tables/lgd_cuantiles_val.csv</code>.</p>
+<figure><img alt="Figura 4" src="results/figures/lgd_pred_vs_obs.png" loading="lazy" onerror="figRespaldo(this)"></figure>
+<p class="cap"><strong>Figura 4.</strong> Histograma de la LGD observada en validación (gris) y de las predicciones de la semilla
+0 de cada red y de la lineal. <em>Fuente:</em> elaboración propia; <code>fase_resumir</code> en
+<code>src/search/lgd_random_search.py</code>, <code>results/figures/lgd_pred_vs_obs.png</code>.</p>
+<ul>
+<li><strong>Todas encogen.</strong> La sd predicha es menos de la mitad de la observada. El percentil 1 observado es
+  0,11, pero ninguna red predice por debajo de 0,38. Era lo esperado (predicción 2): una red que estima
+  la media condicional con un $R^2$ de 0,23 no puede reproducir la dispersión de $y$, porque la mayor
+  parte de esa dispersión no la explican las variables.</li>
+<li><strong>La BCE es la más cercana a la observada</strong> en KS y Wasserstein, aunque frente a la MSE la diferencia en
+  Wasserstein es menor que su desviación entre semillas. En KS la BCE es menor en 25 de 30 semillas.</li>
+<li><strong>Las redes no llegan a la cola alta.</strong> Entre el 21 % y el 29 % de las LGD observadas superan la mayor
+  predicción. En la Figura 4 las redes acumulan masa justo en su máximo (un pico estrecho cerca de
+  0,87 para BCE y MSE, y de 0,84 para la Beta). La lineal, que no tiene sigmoide, sí llega a 1 (en
+  realidad se recorta en 1). El apartado «El techo de la tanh» estudia si ese tope le cuesta algo a la red.</li>
+</ul>
+<h3>Calibración por deciles</h3>
+<figure><img alt="Figura 5" src="results/figures/lgd_calibracion_deciles.png" loading="lazy" onerror="figRespaldo(this)"></figure>
+<p class="cap"><strong>Figura 5.</strong> LGD media observada frente a la predicha en cada decil de la predicción (semilla 0,
+validación). Los colores no coinciden con los de la Figura 4: aquí la BCE es verde y la lineal azul.
+<em>Fuente:</em> elaboración propia; <code>fase_diagnostico</code> en <code>src/search/lgd_random_search.py</code>,
+<code>results/tables/lgd_calibracion_deciles.csv</code>.</p>
+<p>Como se observa en la Figura 5, la BCE, la MSE y la lineal están cerca de la diagonal en todos los
+deciles (la mayor distancia es de 0,014, de la MSE en el decil 4). La BCE sobrestima un poco entre los deciles 7 y 9 (por ejemplo, 0,834 predicha frente a 0,824
+observada en el decil 9). La <strong>Beta subestima la LGD en los deciles altos</strong>: 0,823 frente a 0,868 en el
+decil 10, y su media predicha (0,694 en promedio de las 30 semillas; 0,686 en la semilla 0 de la figura) queda 0,012 por debajo de la observada (0,706).</p>
+<p><em>Hipótesis, no comprobada:</em> con valores de $y$ recortados a $1-\varepsilon$, el término $\log(1-y)$ de
+la Beta es muy grande y desplaza la media estimada hacia abajo. Es coherente con la sensibilidad a
+$\varepsilon$ (sección «Funciones de pérdida por máxima verosimilitud», apartado «Limitaciones y ajustes posibles»): el RMSE de la Beta mejora de 0,1799 con
+$\varepsilon = 10^{-4}$ a 0,1788 con $\varepsilon = 10^{-2}$ (<code>results/tables/lgd_sensibilidad_eps.csv</code>).</p>
+<h3>El techo de la tanh</h3>
+<p>La última capa oculta usa tanh, así que cada una de sus 32 neuronas vale entre −1 y 1. El logit de salida
+$z = b + \sum_j w_j h_j$ queda acotado por $b + \sum_j |w_j|$, y la red <strong>no puede predecir más que</strong></p>
+<div class="eq">$$\text{techo} = \sigma\Big(b + \sum_j |w_j|\Big).$$</div>
+<p>La Tabla 17 compara ese techo con las predicciones de las 30 semillas y con la misma red con ReLU.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Diagnóstico (30 semillas)</th>
+<th>Media</th>
+<th>Mín.</th>
+<th>Máx.</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Techo teórico $\sigma(b + \sum_j \lvert w_j\rvert)$</td>
+<td>0,877</td>
+<td>0,867</td>
+<td>0,887</td>
+</tr>
+<tr>
+<td>Predicción máxima en validación</td>
+<td>0,875</td>
+<td>0,865</td>
+<td>0,884</td>
+</tr>
+<tr>
+<td>Neuronas saturadas ($\lvert h\rvert &gt; 0{,}99$), 1 % de predicciones más altas</td>
+<td>44 %</td>
+<td>18 %</td>
+<td>72 %</td>
+</tr>
+<tr>
+<td>Neuronas saturadas, resto de predicciones</td>
+<td>19 %</td>
+<td>10 %</td>
+<td>26 %</td>
+</tr>
+<tr>
+<td>RMSE con tanh (semillas 0–4)</td>
+<td>0,17734</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>RMSE con ReLU, misma configuración (semillas 0–4)</td>
+<td>0,17888</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 17.</strong> Diagnóstico del techo de la tanh en la red BCE (validación aleatoria). <em>Fuente:</em>
+elaboración propia; <code>fase_diagnostico</code> en <code>src/search/lgd_random_search.py</code>,
+<code>results/tables/lgd_diagnostico_techo.csv</code> y <code>lgd_techo_relu.csv</code>.</p>
+<ul>
+<li><strong>La red llega al techo.</strong> La predicción máxima es el 99,8 % del techo teórico, y en las predicciones
+  más altas el doble de neuronas están saturadas. Eso explica el pico en el máximo de la Figura 4.</li>
+<li><strong>Pero el techo no cuesta RMSE.</strong> El decil más alto está calibrado (0,864 predicha, 0,868 observada;
+  Figura 5), y la misma configuración con ReLU, que no tiene techo, es <strong>peor en las 5 semillas</strong>
+  (0,17888 frente a 0,17734).</li>
+<li><strong>Conclusión:</strong> el 21 % de observadas por encima del máximo se debe sobre todo al encogimiento (la red
+  predice medias), no al techo. Esto tiene límites: la ReLU se probó con hiperparámetros elegidos para la
+  tanh y con solo 5 semillas.</li>
+</ul>
+<h3>Estabilidad temporal</h3>
+<p>Se reentrenó la configuración final con la partición temporal: entrenamiento hasta 2013 ($n = 31.527$),
+validación 2014 ($n = 19.441$). La prueba (2015) no se usó. La Tabla 18 compara la red (5 semillas)
+con la lineal.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Modelo</th>
+<th>RMSE</th>
+<th>MAE</th>
+<th>$R^2$</th>
+<th>LGD media predicha</th>
+<th>Sesgo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MLP BCE (5 semillas: media)</td>
+<td>0,164</td>
+<td>0,138</td>
+<td>−0,81</td>
+<td>0,646</td>
+<td>−0,122</td>
+</tr>
+<tr>
+<td>MLP BCE (rango)</td>
+<td>0,155 – 0,169</td>
+<td>0,128 – 0,144</td>
+<td>−0,93 – −0,61</td>
+<td>0,637 – 0,658</td>
+<td>−0,131 – −0,110</td>
+</tr>
+<tr>
+<td>Lineal</td>
+<td>0,174</td>
+<td>0,148</td>
+<td>−1,04</td>
+<td>0,632</td>
+<td>−0,136</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 18.</strong> Configuración final con partición temporal, validación 2014. LGD media observada: 0,615
+en entrenamiento y 0,768 en validación. <em>Fuente:</em> elaboración propia; <code>fase_temporal</code> en
+<code>src/search/lgd_random_search.py</code>, <code>results/tables/lgd_estabilidad_temporal.csv</code>.</p>
+<ul>
+<li><strong>El $R^2$ es negativo aunque el RMSE es menor que en la partición aleatoria.</strong> En 2014 la LGD es más
+  alta (0,768 frente a 0,615) y menos dispersa (sd 0,122 frente a 0,216). Los modelos aprenden la media
+  de entrenamiento y quedan unas 0,12 por debajo; con tan poca varianza en validación, ese sesgo basta
+  para que el $R^2$ sea negativo.</li>
+<li><strong>La causa es la censura de las recuperaciones</strong> (sección «Variables objetivo»): los créditos recientes han tenido menos
+  tiempo para recuperar, así que su LGD observada es más alta. No es un fallo de la red, y por eso la
+  selección se hizo con la partición aleatoria (sección «Funciones de pérdida por máxima verosimilitud», apartado «Criterio de selección (fijado antes de entrenar)»).</li>
+<li><strong>Aun así, la red tiene menos sesgo y menor RMSE que la lineal</strong> en las 5 semillas.</li>
+</ul>
+<h3>Curva de entrenamiento</h3>
+<figure><img alt="Figura 6" src="results/figures/lgd_curva_aprendizaje.png" loading="lazy" onerror="figRespaldo(this)"></figure>
+<p class="cap"><strong>Figura 6.</strong> Pérdida BCE de entrenamiento y validación por época, configuración final, semilla 0.
+<em>Fuente:</em> elaboración propia; <code>fase_resumir</code> en <code>src/search/lgd_random_search.py</code>,
+<code>results/figures/lgd_curva_aprendizaje.png</code>.</p>
+<p>Como se observa en la Figura 6, la pérdida de validación alcanza su mínimo en la época 29, y la parada temprana detiene el entrenamiento
+10 épocas después. La curva de entrenamiento queda <strong>por encima</strong> de la de validación por dos razones, y
+ninguna indica un problema: se mide con dropout activo y la de validación sin él, e incluye la
+penalización L2, que la de validación no tiene. Con los pesos finales de la semilla 0 ese término vale
+0,0018, del mismo orden que la brecha entre las curvas en la mejor época (unas 0,003; sección «Optimizador y regularización»,
+apartado «Qué usa cada modelo»). El rango de la pérdida es estrecho (de
+0,582 a 0,596) porque la BCE fraccional tiene un piso igual a la entropía de $y$ (sección «Funciones de pérdida por máxima verosimilitud», apartado «Las tres candidatas frente a los datos»): su valor absoluto no es comparable con el de otras pérdidas, y por eso la selección usa el RMSE.</p>
+<h3>Limitaciones y ajustes</h3>
+<ul>
+<li><strong>No se ajustó la red para reproducir la distribución observada.</strong> La guía sugiere hacerlo si la
+  distribución predicha no reproduce la observada. Se probaron tres posibles causas: la activación (ReLU
+  en vez de tanh, apartado «El techo de la tanh»), la pérdida (la Beta, apartado «Distribución predicha frente a la observada») y $\varepsilon$ en la Beta (apartado «Calibración por deciles»).
+  Ninguna acercó las distribuciones sin empeorar el RMSE. <em>Hipótesis:</em> cualquier ajuste que ensanche
+  las predicciones puntuales las alejaría de la media condicional y subiría el RMSE. Si la aplicación
+  necesitara la distribución completa de la LGD de un crédito, lo indicado sería usar la distribución
+  predictiva (por ejemplo, la Beta con $\mu$ y $\phi$), no las predicciones puntuales.</li>
+<li><strong>La precisión $\phi$ de la Beta es constante.</strong> La sección «Funciones de pérdida por máxima verosimilitud» (apartado «Limitaciones y ajustes posibles») dejó como ajuste posible
+  modelarla en función de las variables; no se hizo.</li>
+<li><strong>El desempate se probó con la desviación estándar de las predicciones</strong>, que resume la forma en un
+  solo número. El KS y el Wasserstein de la Tabla 15 lo confirman, pero se calcularon después de
+  elegir.</li>
+<li><strong>La comparación con ReLU</strong> usa 5 semillas e hiperparámetros elegidos para la tanh.</li>
+<li><strong>Todo está medido en validación</strong>, que también se usó para seleccionar. La estimación sin sesgo de
+  selección es la de prueba.</li>
+</ul>
+</div>
+</details>
+<!-- resultados:fin -->
+        </section>
         <section class="wrap section">
             <div class="section-head">
                 <div>
@@ -862,6 +2579,241 @@
                 </div>
             </div>
             <div class="hypotheses"><article class="hypo"><div class="n">HIPÓTESIS / H1</div><h3>Más deuda, mayor riesgo</h3><p>DTI sobre el percentil 75 frente a DTI menor de 15: tasa de incumplimiento 24,9 % vs 15,8 % (entrenamiento) y 36,2 % vs 19,1 % (2015).</p><span class="status">CONFIRMADA</span></article><article class="hypo"><div class="n">HIPÓTESIS / H3</div><h3>Uso del crédito rotativo</h3><p>Con revol_util mayor de 80 % hay más riesgo, pero la relación es casi lineal y no acelera cerca del límite.</p><span class="status">PARCIALMENTE CONFIRMADA</span></article><article class="hypo"><div class="n">HIPÓTESIS / H2 / H4</div><h3>Consultas recientes y antigüedad laboral</h3><p>H2 queda por debajo del umbral de razón 1,5 y H4 cambia de signo entre muestras (sesgo de madurez en 2015).</p><span class="status">NO CONFIRMADAS</span></article><article class="hypo"><div class="n">HIPÓTESIS / H5</div><h3>El monto agranda la pérdida</h3><p>LGD media 0,676 vs 0,582 entre créditos grandes y pequeños, en buena parte por el plazo.</p><span class="status">CONFIRMADA (efecto pequeño)</span></article></div>
+        </section>
+        <section class="wrap section" id="ia">
+            <div class="section-head">
+                <div>
+                    <div class="eyebrow">Uso de IA</div>
+                    <h2>Cacería de alucinaciones</h2>
+                </div>
+                <p>Afirmaciones de la IA que resultaron falsas, con el prompt, la evidencia y la corrección.</p>
+            </div>
+<!-- ia:inicio -->
+<details class="teoria" id="ia-hallazgos">
+<summary><span>Hallazgos y verificaciones</span></summary>
+<div class="prosa">
+<p>Cada hallazgo sigue los seis puntos del enunciado. Las cifras se recalcularon con la partición aleatoria
+vigente (<code>split_seed: 90</code>). Cuando la respuesta de la IA cita números, son los de la partición que había
+en ese momento.</p>
+<hr />
+<h3>JR-1. "Eso no equivale a sumar λ‖w‖²; esa es la diferencia entre Adam y AdamW" (razón equivocada)</h3>
+<ul>
+<li><strong>Categoría:</strong> matemáticas / conceptos (optimizador y regularización)</li>
+<li><strong>IA:</strong> Claude (Claude Code, Opus 5.5) · <strong>fecha:</strong> 2026-10-24</li>
+<li><strong>1. Prompt (literal):</strong><blockquote>
+<p>bien, parece que mis compañeros ya hicieron varios merge a develop, antes de generar un conflicto
+puedes resumirme los comits y que avanzaron?</p>
+</blockquote>
+</li>
+<li><strong>2. Respuesta de la IA (parte relevante, literal):</strong><blockquote>
+<p>7. <strong>L2 implementada como <code>weight_decay</code> dentro de Adam.</strong> Con Adam eso no equivale exactamente a
+sumar λ‖w‖² a la pérdida; esa es la diferencia entre Adam y AdamW. Es un buen punto para tu
+sección 3.5 y posible material para la cacería de alucinaciones.</p>
+</blockquote>
+</li>
+<li><strong>3. Sospecha:</strong> tomada al pie de la letra, la frase es cierta solo por un factor: el gradiente de
+  $\tfrac{\lambda}{2}\lVert w\rVert^2$ es $\lambda w$, así que <code>weight_decay=λ</code> equivale a sumar
+  $\tfrac{\lambda}{2}\lVert w\rVert^2$ y no $\lambda\lVert w\rVert^2$. Lo dudoso es la razón: atribuirlo a la
+  diferencia entre Adam y AdamW sugiere que el <code>weight_decay</code> de Adam no es una L2. Si suma $\lambda w$
+  al gradiente antes de los momentos, debería ser exactamente una L2.</li>
+<li><strong>4. Evidencia:</strong><ul>
+<li>En el código fuente de PyTorch 2.14.1 (<code>torch/optim/adam.py</code>), con <code>weight_decay</code> y sin
+<code>decoupled_weight_decay</code>, Adam hace <code>grad = grad.add(param, alpha=weight_decay)</code> antes de actualizar
+los momentos.</li>
+<li>Experimento <code>tests/test_optim.py::test_weight_decay_de_adam_es_l2_y_adamw_no</code>: MLP 5→8→1 en float64,
+$\lambda = 0{,}1$, 30 pasos desde los mismos pesos. <code>Adam(weight_decay=0,1)</code> y Adam sobre
+<code>bce + 0,1 · penalizacion_l2</code> difieren en menos de $10^{-16}$ (iguales a precisión de
+máquina en cada paso). <code>AdamW</code> se separa en 0,58.</li>
+<li>Comando: <code>python -m pytest tests/test_optim.py -k weight_decay</code>.</li>
+</ul>
+</li>
+<li><strong>5. Corrección:</strong> con <code>weight_decay=λ</code>, Adam minimiza exactamente $L + \tfrac{\lambda}{2}\lVert w\rVert^2$:
+  el <code>weight_decay</code> acoplado <strong>sí</strong> es una L2 en la pérdida, y la única diferencia con "sumar λ‖w‖²" es el
+  factor ½ (equivale a usar 2λ). Lo que no equivale a una L2 es el decaimiento desacoplado de AdamW. El
+  único reparo real al uso de <code>weight_decay</code> en la red de PD es que también penaliza los sesgos
+  (sección «Optimizador y regularización»).</li>
+<li><strong>6. Lección:</strong> cuando una IA dice "A no equivale a B", escribir las dos actualizaciones y
+  comprobarlas con un experimento de pocos pasos antes de repetirlo en el reporte.</li>
+</ul>
+<hr />
+<h3>JR-2. "La MSE tiende a encoger las predicciones hacia la media" (como defecto propio de la MSE)</h3>
+<ul>
+<li><strong>Categoría:</strong> conceptos</li>
+<li><strong>IA:</strong> Claude (Claude Code, Opus 5.5) · <strong>fecha:</strong> 2026-10-24</li>
+<li><strong>1. Prompt (literal):</strong><blockquote>
+<p>PARTE A. Confirmación de comprensión (con tus palabras, no copies la guía). Explícame:<br />
+1. Qué tengo que entregar en  (PD) y en  (LGD).<br />
+2. Qué artefactos son míos (módulos, configs, secciones del reporte, modelos exportados) y cuáles solo reviso o consumo.<br />
+3. Qué contratos de la sección 7 de la guía me involucran.</p>
+<p>PARTE B. Plan de trabajo para terminar mi parte con éxito Propón un plan por etapas, en orden, donde cada etapa indique: - Qué hago y qué archivos toca. - De qué depende (y si puedo avanzar con datos sintéticos mientras espero). - Cómo verifico que quedó bien (pruebas, verificación de gradientes contra autograd y diferencias finitas, comparación contra una implementación de referencia).</p>
+<p>PARTE D. Decisiones abiertas Lista las decisiones técnicas que debo tomar o acordar con el equipo antes de avanzar (framework, política de semillas, tratamiento de 0 y 1 en la Beta, pérdida candidata para LGD, presupuesto de búsqueda, etc.). Para cada una, da las opciones con sus pros y contras y tu recomendación, pero no decidas por mí.</p>
+<p>Reglas  - Explícame el porqué de cada paso, porque tengo que poder defender y explicar mi parte en la sustentación. - Cuando empecemos a implementar, quiero ir paso a paso, una etapa por vez, y que me expliques cada decisión antes de aplicarla. - No cites referencias bibliográficas de memoria</p>
+</blockquote>
+</li>
+<li><strong>2. Respuesta de la IA (parte relevante, literal):</strong><blockquote>
+<p><strong>MSE</strong>: simple y coincide con la métrica RMSE, pero supone ruido gaussiano y tiende a encoger las
+predicciones hacia la media.</p>
+</blockquote>
+</li>
+<li><strong>3. Sospecha:</strong> cualquier modelo que predice la media condicional $E[Y\mid x]$ produce predicciones
+  menos dispersas que los datos, porque no puede predecir la parte de $Y$ que las variables no explican.
+  No es una propiedad de la MSE en particular.</li>
+<li><strong>4. Evidencia:</strong> 30 semillas por pérdida en la validación aleatoria de LGD. La desviación estándar de
+  la LGD observada es 0,202. La de las predicciones es 0,097 con BCE fraccional, 0,096 con MSE, 0,087 con
+  Beta y 0,088 con la regresión lineal. Las tres pérdidas encogen de forma parecida, y la Beta incluso más
+  que la MSE (<code>results/tables/lgd_semillas_resumen.csv</code>; sección «Red neuronal de LGD», Tabla 13).</li>
+<li><strong>5. Corrección:</strong> encoger la distribución es una propiedad de predecir medias condicionales. Las
+  pérdidas difieren en cómo ponderan los errores, y solo la Beta da una distribución completa.</li>
+<li><strong>6. Lección:</strong> separar "propiedad de la pérdida" de "propiedad de predecir una media"; comprobarlo
+  comparando todas las pérdidas sobre los mismos datos.</li>
+</ul>
+<hr />
+<h3>JR-3. "La Beta con φ constante es exacta en los deciles bajos" (comparación mal planteada)</h3>
+<ul>
+<li><strong>Categoría:</strong> conceptos (varianza condicional frente a marginal)</li>
+<li><strong>IA:</strong> Claude (Claude Code, Opus 5.5) · <strong>fecha:</strong> 2026-10-25</li>
+<li><strong>1. Prompt (literal):</strong><blockquote>
+<p>sigueme explicando la etapa 4</p>
+</blockquote>
+</li>
+<li><strong>2. Respuesta de la IA (parte relevante, literal):</strong> una tabla con la columna "Varianza Beta:
+  μ(1−μ)/(1+φ)", calculada con el φ = 3,83 del ajuste marginal, y la conclusión:<blockquote>
+<p>La Beta con φ constante acierta la dirección y es exacta en los deciles bajos, pero <strong>se queda
+corta en los altos</strong>: la varianza real cae más rápido.</p>
+</blockquote>
+</li>
+<li><strong>3. Sospecha:</strong> el φ viene del ajuste <strong>marginal</strong> de la Beta, sin variables, que mezcla la varianza
+  que explican las variables con la que no explican. La varianza <strong>dentro</strong> de cada decil es condicional
+  y no tiene por qué coincidir con $\mu(1-\mu)/(1+\phi_{\text{marginal}})$.</li>
+<li><strong>4. Evidencia:</strong> con los datos actuales, φ marginal = 3,815. En el decil 1 la Beta da 0,0506 y la
+  varianza observada es 0,0508; en el decil 5, 0,0447 frente a 0,0396. La coincidencia en el decil 1 es
+  casual. Para comparar solo la forma, el cociente varianza observada / $\mu(1-\mu)$ cae de 0,208 en el
+  decil 1 a 0,085 en el decil 10: la varianza real cae unas 2,5 veces más rápido que la forma
+  $\mu(1-\mu)$. (Deciles de la predicción lineal en el entrenamiento aleatorio; figura
+  <code>results/figures/lgd_varianza_por_decil.png</code>, sección «Funciones de pérdida por máxima verosimilitud».)</li>
+<li><strong>5. Corrección:</strong> la BCE fraccional y la Beta con φ constante suponen la misma forma de varianza,
+  proporcional a $\mu(1-\mu)$. Esa forma capta parte de la caída observada, pero la varianza real cae más
+  rápido. No hay base para decir que la Beta es "exacta" en ningún decil.</li>
+<li><strong>6. Lección:</strong> no comparar un parámetro estimado sin variables (marginal) con una cantidad
+  condicional; cuando solo interesa la forma, normalizar antes de comparar.</li>
+</ul>
+<hr />
+<h3>JR-4. "La Beta subestima por la asimetría a la izquierda; esto explica su peor RMSE" (causa sin evidencia)</h3>
+<ul>
+<li><strong>Categoría:</strong> conceptos (atribuir una causa sin comprobarla)</li>
+<li><strong>IA:</strong> Claude (Claude Code, Opus 5.5) · <strong>fecha:</strong> 2026-10-25</li>
+<li><strong>1. Prompt (literal):</strong><blockquote>
+<p>sigueme explicando la etapa 7</p>
+</blockquote>
+</li>
+<li><strong>2. Respuesta de la IA (parte relevante, literal):</strong><blockquote>
+<p>Encaja con lo que dijimos en la Etapa 1: si los datos no son Beta, su ecuación iguala E[logit Y] y
+no E[Y], y con una LGD asimétrica a la izquierda eso tira la predicción hacia abajo. <strong>Esto explica
+por qué la Beta tiene peor RMSE.</strong></p>
+</blockquote>
+</li>
+<li><strong>3. Sospecha:</strong> se afirmó una causa (la asimetría) y una explicación completa del peor RMSE sin
+  haberlas probado.</li>
+<li><strong>4. Evidencia</strong> (ajuste marginal de la Beta con <code>ajustar_beta_marginal</code> de <code>src/models/lgd_mlp.py</code>,
+  entrenamiento aleatorio, 41.173 créditos):<ul>
+<li><strong>La parte matemática es correcta, pero en otra forma.</strong> La MLE de la Beta no iguala la media de $y$
+sino sus log-momentos. Con $\varepsilon = 10^{-4}$: $\psi(\alpha) - \psi(\alpha+\beta) = -0{,}42850$,
+igual a la media de $\ln y$, y $\psi(\beta) - \psi(\alpha+\beta) = -1{,}53511$, igual a la media de
+$\ln(1-y)$.</li>
+<li><strong>Control.</strong> Con 41.173 valores simulados de la Beta ajustada (semilla 0), la media ajustada coincide
+con la muestral (diferencia +0,0003). Con la LGD real queda 0,0095 por debajo de la media (0,694 frente
+a 0,704), con
+$\varepsilon$ = $10^{-2}$, $10^{-3}$ o $10^{-4}$, y también sin los 284 valores exactamente 0 o 1
+(−0,0099).</li>
+<li><strong>Lo que no está probado:</strong> que la causa sea la asimetría a la izquierda, ni que esto explique por sí
+solo el peor RMSE de la red. La red Beta tiene un sesgo medio de −0,012 en validación y subestima sobre
+todo en los deciles altos (sección «Red neuronal de LGD», apartado «Calibración por deciles»). Además, su RMSE mejora al aumentar $\varepsilon$
+(0,1799 con $10^{-4}$ y 0,1788 con $10^{-2}$; <code>results/tables/lgd_sensibilidad_eps.csv</code>), lo que apunta
+también al tratamiento de los valores cercanos a 1, no solo a la asimetría.</li>
+</ul>
+</li>
+<li><strong>5. Corrección:</strong> la frase precisa es "la MLE de la Beta iguala log-momentos y no la media; en estos
+  datos, sin variables, la media ajustada queda 0,0095 por debajo de la real". Que eso explique el sesgo
+  y el peor RMSE de la red es una hipótesis.</li>
+<li><strong>6. Lección:</strong> separar lo que sale de una derivación de lo que es una explicación plausible. Antes de
+  decir "esto explica", buscar un control (aquí, datos simulados de una Beta) y otras causas posibles
+  (aquí, $\varepsilon$).</li>
+</ul>
+<hr />
+<h3>Verificaciones sin hallazgo</h3>
+<p>Afirmaciones (de una IA o propias) que se comprobaron y resultaron correctas, más un problema de código
+encontrado al verificar. Se resumen en la Tabla 19.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Qué se afirmó o comprobó</th>
+<th>Cómo se verificó</th>
+<th>Resultado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>La forma estable habitual de la BCE, <code>max(z,0) - z·y + log1p(exp(-\|z\|))</code>, tiene gradiente $(\sigma(z)-y)/n$</td>
+<td>autograd en float64 con $z = [0, 0]$, $y = [0, 1]$</td>
+<td><strong>Falla en $z = 0$</strong>: autograd da $[0; -0{,}5]$ en vez de $[0{,}25; -0{,}25]$, porque <code>max</code> y <code>abs</code> no son derivables ahí. <code>src/models/losses.py</code> usa <code>logaddexp(0, z) - y·z</code>, que da el valor correcto (<code>tests/test_losses.py::test_gradiente_contra_autograd</code> incluye $z = 0$)</td>
+</tr>
+<tr>
+<td>$\partial\,\text{BCE}/\partial z = (\sigma(z) - y)/n$</td>
+<td>autograd y <code>gradcheck</code> en float64 (<code>tests/test_losses.py</code>)</td>
+<td>correcto</td>
+</tr>
+<tr>
+<td>$\partial\,\text{MSE}/\partial z = 2(\sigma - y)\,\sigma(1-\sigma)/n$, y se anula con la sigmoide saturada</td>
+<td>autograd, <code>gradcheck</code> y <code>test_mse_se_satura_con_logits_extremos</code></td>
+<td>correcto</td>
+</tr>
+<tr>
+<td>$\int_0^1 \mu^y(1-\mu)^{1-y}\,dy \neq 1$: la BCE fraccional no es una verosimilitud</td>
+<td><code>scipy.integrate.quad</code> con $\mu$ = 0,5; 0,7; 0,9: 0,5000; 0,4721; 0,3641</td>
+<td>correcto</td>
+</tr>
+<tr>
+<td>La BCE fraccional se minimiza en la media de $y$, con mínimo igual a la entropía $H(y)$</td>
+<td><code>test_bce_fraccional_estima_la_media</code> y <code>test_bce_fraccional_minimo_en_y</code></td>
+<td>correcto</td>
+</tr>
+<tr>
+<td>Adam: $t$ empieza en 1, $\varepsilon$ va fuera de la raíz, valores por defecto (0,9; 0,999; $10^{-8}$)</td>
+<td>código fuente de PyTorch 2.14.1 y <code>test_adam_igual_a_pytorch</code> (50 pasos iguales)</td>
+<td>correcto</td>
+</tr>
+<tr>
+<td>El primer paso de Adam mide $\eta$; sin corrección de sesgo sería $\sqrt{10}\,\eta$</td>
+<td><code>test_adam_primer_paso_mide_lr</code></td>
+<td>correcto</td>
+</tr>
+<tr>
+<td>Adam es invariante a la escala de la pérdida y SGD no</td>
+<td><code>test_adam_invariante_a_la_escala_y_sgd_no</code></td>
+<td>correcto</td>
+</tr>
+<tr>
+<td>SGD diverge en $f = (100x^2 + y^2)/2$ si $\eta &gt; 2/100$</td>
+<td>ejecución: converge con 0,019 y diverge con 0,021; <code>test_cuadratica_mal_condicionada_sgd_diverge_y_adam_converge</code></td>
+<td>correcto</td>
+</tr>
+<tr>
+<td>Revisión automática de Sourcery (otra IA) sobre el PR #9: carga insegura con joblib, NaN en <code>gradiente_beta</code> con logits extremos y carpeta de figuras inexistente</td>
+<td>lectura del código</td>
+<td>las tres observaciones son correctas o parcialmente correctas; ninguna es una alucinación</td>
+</tr>
+<tr>
+<td>Referencias APA de 3.3, 3.5 y 5.1 entregadas por una IA como "verificadas" (2026-10-30; el prompt no se conservó, por eso no se registra como hallazgo)</td>
+<td>Crossref (<code>api.crossref.org/works/&lt;DOI&gt;</code>), arXiv, JMLR y el registro del libro de MIT Press</td>
+<td><strong>Errores encontrados:</strong> para Papke y Wooldridge (1996) dio dos DOI distintos, y el de la forma <code>(199611/12)</code> no está en Crossref (el correcto termina en <code>(199611)11:6&lt;619::AID-JAE418&gt;3.0.CO;2-1</code>); para Platt dio 1999 y 2000 en la misma respuesta (el libro de MIT Press es de 2000); omitió el número 85 de scikit-learn en <em>JMLR</em> 12; citó ICLR como "Proceedings" aunque no tiene actas formales. Las otras seis entradas eran correctas. Se corrigieron en las secciones</td>
+</tr>
+</tbody>
+</table></div>
+<p class="cap"><strong>Tabla 19.</strong> Verificaciones hechas por el grupo. <em>Fuente:</em> elaboración propia; pruebas en <code>tests/test_losses.py</code> y
+<code>tests/test_optim.py</code>.</p>
+</div>
+</details>
+<!-- ia:fin -->
         </section>
         <section class="wrap section">
             <div class="section-head">
@@ -872,7 +2824,7 @@
                 <p>Enlaces del trabajo.</p>
             </div>
             <div class="panel">
-                <div class="links"><a id="lnkRepo" href="https://github.com/jcuartasl/RNA_20262_mePrestas" target="_blank" rel="noopener">REPOSITORIO GIT ↗</a><a id="lnkVideo" href="https://youtu.be/Li35oMpmqmk" target="_blank" rel="noopener">VIDEO PROMOCIONAL ↗</a></div>
+                <div class="links"><a id="lnkRepo" href="https://github.com/jcuartasl/RNA_20262_mePrestas" target="_blank" rel="noopener">REPOSITORIO GIT ↗</a><a id="lnkVideo" href="https://youtu.be/5m5lGOBUuW0" target="_blank" rel="noopener">VIDEO PROMOCIONAL ↗</a></div>
                 <p class="tooltip" id="linksNote" style="margin:20px 0 0">Los enlaces se leen de las variables ME_PRESTAS_REPO_URL y ME_PRESTAS_VIDEO_URL del servidor.</p>
                 <h3>Videos de contribuciones individuales</h3>
                 <div class="links">
@@ -882,6 +2834,48 @@
                     <a id="lnkvd4" href="por definir">Contribución César ↗</a>
                     <a id="lnkvd5" href="https://youtu.be/_2cX5IOXo5c">Contribución Juan David ↗</a>
                 </div>
+            </div>
+        </section>
+        <section class="wrap section" id="referencias">
+            <div class="section-head">
+                <div>
+                    <div class="eyebrow">Bibliografía</div>
+                    <h2>Referencias</h2>
+                </div>
+                <p>Formato APA 7, en orden alfabético.</p>
+            </div>
+            <div class="panel">
+<!-- referencias:inicio -->
+<div class="prosa refs">
+<ul>
+<li>Ferrari, S. L. P., &amp; Cribari-Neto, F. (2004). Beta regression for modelling rates and proportions.
+  <em>Journal of Applied Statistics, 31</em>(7), 799–815. <a href="https://doi.org/10.1080/0266476042000214501" target="_blank" rel="noopener">https://doi.org/10.1080/0266476042000214501</a></li>
+<li>Kingma, D. P., &amp; Ba, J. (2015). <em>Adam: A method for stochastic optimization</em> [Conference paper]. 3rd
+  International Conference on Learning Representations, San Diego, CA, United States.
+  <a href="https://doi.org/10.48550/arXiv.1412.6980" target="_blank" rel="noopener">https://doi.org/10.48550/arXiv.1412.6980</a></li>
+<li>Loshchilov, I., &amp; Hutter, F. (2019). <em>Decoupled weight decay regularization</em> [Conference paper].
+  International Conference on Learning Representations (ICLR 2019). <a href="https://doi.org/10.48550/arXiv.1711.05101" target="_blank" rel="noopener">https://doi.org/10.48550/arXiv.1711.05101</a></li>
+<li>Papke, L. E., &amp; Wooldridge, J. M. (1996). Econometric methods for fractional response variables with an
+  application to 401(k) plan participation rates. <em>Journal of Applied Econometrics, 11</em>(6), 619–632.
+  <a href="https://doi.org/10.1002/(SICI)1099-1255(199611)11:6%3C619::AID-JAE418%3E3.0.CO;2-1" target="_blank" rel="noopener">https://doi.org/10.1002/(SICI)1099-1255(199611)11:6%3C619::AID-JAE418%3E3.0.CO;2-1</a></li>
+<li>Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., Blondel, M.,
+  Prettenhofer, P., Weiss, R., Dubourg, V., Vanderplas, J., Passos, A., Cournapeau, D., Brucher, M.,
+  Perrot, M., &amp; Duchesnay, É. (2011). Scikit-learn: Machine learning in Python. <em>Journal of Machine
+  Learning Research, 12</em>(85), 2825–2830. <a href="https://jmlr.org/papers/v12/pedregosa11a.html" target="_blank" rel="noopener">https://jmlr.org/papers/v12/pedregosa11a.html</a></li>
+<li>Platt, J. C. (2000). Probabilistic outputs for support vector machines and comparisons to regularized
+  likelihood methods. En A. J. Smola, P. L. Bartlett, B. Schölkopf y D. Schuurmans (Eds.), <em>Advances in
+  large margin classifiers</em> (pp. 61–74). MIT Press.</li>
+<li>Smithson, M., &amp; Verkuilen, J. (2006). A better lemon squeezer? Maximum-likelihood regression with
+  beta-distributed dependent variables. <em>Psychological Methods, 11</em>(1), 54–71.
+  <a href="https://doi.org/10.1037/1082-989X.11.1.54" target="_blank" rel="noopener">https://doi.org/10.1037/1082-989X.11.1.54</a></li>
+<li>Srivastava, N., Hinton, G., Krizhevsky, A., Sutskever, I., &amp; Salakhutdinov, R. (2014). Dropout: A simple
+  way to prevent neural networks from overfitting. <em>Journal of Machine Learning Research, 15</em>(56),
+  1929–1958. <a href="https://jmlr.org/papers/v15/srivastava14a.html" target="_blank" rel="noopener">https://jmlr.org/papers/v15/srivastava14a.html</a></li>
+<li>Wedderburn, R. W. M. (1974). Quasi-likelihood functions, generalized linear models, and the
+  Gauss–Newton method. <em>Biometrika, 61</em>(3), 439–447. <a href="https://doi.org/10.1093/biomet/61.3.439" target="_blank" rel="noopener">https://doi.org/10.1093/biomet/61.3.439</a></li>
+</ul>
+</div>
+<!-- referencias:fin -->
             </div>
         </section>
         </main>
@@ -1159,7 +3153,22 @@
         syncWi(true); window.addEventListener('resize', () => lastBase && dibujarPoblacion(lastBase.Puntaje)); compute();
     }
     init();
+
+    // secciones del reporte: figuras con respaldo a la API y fórmulas con KaTeX solo dentro de .prosa
+    function figRespaldo(img) {
+        if (img.dataset.respaldo) return;
+        img.dataset.respaldo = '1';
+        img.src = `${API_BASE_URL}/figuras/${img.src.split('/').pop()}`;
+    }
+    function renderTeoria() {
+        document.querySelectorAll('.prosa').forEach(el => renderMathInElement(el, {
+            delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }],
+            throwOnError: false
+        }));
+    }
 </script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js" onload="renderTeoria()"></script>
 
     
 </body>

@@ -33,7 +33,7 @@ pip install -r requirements.txt
 
 #Definición de variables de entorno que se leen en la app web
 $env:ME_PRESTAS_REPO_URL="https://github.com/jcuartasl/RNA_20262_mePrestas"
-$env:ME_PRESTAS_VIDEO_URL="https://youtu.be/Li35oMpmqmk"
+$env:ME_PRESTAS_VIDEO_URL="https://youtu.be/5m5lGOBUuW0"
 ```
 
 ## Datos

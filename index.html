@@ -721,14 +721,7 @@
         .refs ul { list-style: none; padding: 0; margin: 0 }
         .refs li { padding-left: 2em; text-indent: -2em; margin-bottom: 10px }
         @media(max-width:480px) { .prosa { padding: 4px 14px 16px; font-size: 14px } details.teoria summary { padding: 14px } }
-
-/* P2: adaptaciones discretas sobre el estilo existente .teoria y .prosa */
-.p2-informe .prosa img { display:block; max-width:100%; height:auto; margin:16px auto; background:#fff; border-radius:4px; }
-.p2-informe .p2-equation { overflow-x:auto; overflow-y:hidden; margin:18px 0; padding:12px 4px; }
-.p2-informe .prosa table { display:block; max-width:100%; overflow-x:auto; }
-.p2-informe .prosa pre { max-width:100%; overflow-x:auto; }
-
-</style>
+    </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
 </head>
 
@@ -737,8 +730,7 @@
     <header class="topline">
         <div class="wrap nav">
             <div class="brand">[LAB] / RIESGO_CREDITICIO</div>
-            <nav class="navlinks"><a href="#simulador">SIMULADOR</a><a href="#metodo">METODOLOGÍA</a><a
-                    href="#resultados">RESULTADOS</a><a href="#fundamentos">FUNDAMENTOS</a></nav>
+            <nav class="navlinks"><a href="#simulador">SIMULADOR</a><a href="#metodo">METODOLOGÍA</a><a href="#fundamentos">FUNDAMENTOS</a><a href="#detalle">RESULTADOS</a><a href="#ia">AUDITORÍA IA</a><a href="#referencias">BIBLIOGRAFÍA</a></nav>
         </div>
     </header>
     <main>
@@ -887,6 +879,271 @@
                     <p>Revisar discriminación, calibración, variabilidad, complejidad y limitaciones de uso.</p>
                 </div>
             </div>
+            <div style="margin-top: 32px;">
+<!-- metodo:detalles:inicio -->
+<details class="teoria" id="metodo-caso-uso">
+<summary><span>Datos, caso de uso y prevención de fuga de información</span></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección establece el marco operativo y la justificación de auditoría del espacio de variables
+para originación y admisión de crédito, formalizando las exclusiones metodológicas que impiden la
+fuga de información retrospectiva (<em>data leakage</em>) antes del desembolso.</p>
+</blockquote>
+
+<h3>1. Descripción del conjunto de datos</h3>
+<p>El estudio se fundamenta en el conjunto de datos <strong>Credit Risk Analysis (Lending Club)</strong>
+publicado en Kaggle (descarga registrada el 17 de octubre de 2026 en <code>data/raw/fecha_consulta.py</code>):</p>
+<ul>
+    <li><strong>Dimensiones originales:</strong> 887.379 registros y 74 variables.</li>
+    <li><strong>Periodo temporal:</strong> Préstamos originados entre <strong>junio de 2007</strong> y <strong>diciembre de 2015</strong>.</li>
+    <li><strong>Diccionario oficial:</strong> Contrastado con <code>data/raw/LCDataDictionary.xlsx</code>.</li>
+</ul>
+
+<h3>2. Caso de uso del modelo</h3>
+<p>El modelo está diseñado para un <strong>originador de crédito de consumo (banco comercial o FinTech)</strong>
+en la etapa estricta de <strong>admisión y pre-aprobación</strong>:</p>
+<ul>
+    <li><strong>¿Quién usa el modelo?</strong> El motor automatizado de riesgo de crédito y los analistas del comité de admisión.</li>
+    <li><strong>¿Para qué decisión?</strong> Decidir si una solicitud de crédito entrante debe ser <strong>aprobada o rechazada</strong>, y determinar el monto de provisión o reserva preventiva de capital requerida para cubrir la pérdida esperada.</li>
+    <li><strong>¿En qué momento?</strong> En el instante exacto de la solicitud del cliente, <strong>antes de que se realice el desembolso</strong> de los fondos y antes de fijar condiciones contractuales posteriores.</li>
+    <li><strong>¿Con qué información disponible?</strong> Exclusivamente con datos sociodemográficos verificables (ingresos, tipo de vivienda, estabilidad laboral) junto con el historial crediticio consolidado en el buró a la fecha de consulta (indagaciones recientes, morosidades históricas, líneas abiertas, saldo y tasa de utilización rotativa).</li>
+</ul>
+
+<h3>3. Implicaciones metodológicas y prevención de fuga (Data Leakage)</h3>
+<p>La coherencia con el caso de uso de pre-aprobación exige una auditoría rigurosa sobre el espacio de características. Incluir variables que surgen <em>después</em> del desembolso o que son resultado del propio sistema de decisión introduce <strong>fuga de información retrospectiva</strong>, inflando artificialmente las métricas y tornando al modelo inservible en producción.</p>
+
+<p><strong>A. Exclusión del Scoring Propietario de Lending Club:</strong><br>
+Las variables <code>grade</code>, <code>sub_grade</code>, <code>int_rate</code> y <code>installment</code> son asignadas por Lending Club <em>después</em> de que su propio algoritmo interno evaluó al solicitante y fijó la prima de riesgo. Utilizarlas como predictores crearía un sesgo circular: la red neuronal se limitaría a aproximar la regla de asignación de Lending Club en lugar de aprender el riesgo intrínseco del cliente a partir de su historial. Por tanto, se excluyen de la matriz principal de pre-aprobación.</p>
+
+<p><strong>B. Matriz de Auditoría y Exclusión Sistemática de Fuga:</strong></p>
+<div class="tabla">
+<table>
+<thead>
+<tr>
+<th>Categoría de Fuga</th>
+<th>Variables Excluidas</th>
+<th>Justificación Económica y Operativa</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Pagos acumulados posteriores</strong></td>
+<td><code>total_pymnt</code>, <code>total_pymnt_inv</code>, <code>total_rec_prncp</code>, <code>total_rec_int</code>, <code>total_rec_late_fee</code></td>
+<td>Registran pagos realizados a lo largo de la vida del crédito. En la admisión el cliente no ha pagado un solo centavo; su inclusión generaría una fuga perfecta.</td>
+</tr>
+<tr>
+<td><strong>Eventos post-default / cobranza</strong></td>
+<td><code>recoveries</code>, <code>collection_recovery_fee</code></td>
+<td>Ocurren meses después de declarar el crédito como incobrable. Se excluyen en PD; se retienen exclusivamente para formular la variable continua de LGD.</td>
+</tr>
+<tr>
+<td><strong>Saldos dinámicos en curso</strong></td>
+<td><code>out_prncp</code>, <code>out_prncp_inv</code></td>
+<td>Al originar, el saldo pendiente es exactamente el monto desembolsado. Cualquier reducción revela la amortización futura del préstamo.</td>
+</tr>
+<tr>
+<td><strong>Fechas y eventos posteriores</strong></td>
+<td><code>last_pymnt_d</code>, <code>last_pymnt_amnt</code>, <code>last_credit_pull_d</code>, <code>next_pymnt_d</code></td>
+<td>Eventos transaccionales y revisiones de cartera ocurridas durante la vigencia del crédito. No existen al momento de admitir al cliente.</td>
+</tr>
+<tr>
+<td><strong>Identificadores y texto libre</strong></td>
+<td><code>id</code>, <code>member_id</code>, <code>url</code>, <code>desc</code>, <code>title</code>, <code>emp_title</code>, <code>zip_code</code></td>
+<td>Identificadores únicos o categorías de altísima cardinalidad que inducen sobreajuste memorístico y vulneran la privacidad.</td>
+</tr>
+<tr>
+<td><strong>Scoring propio de Lending Club</strong></td>
+<td><code>grade</code>, <code>sub_grade</code>, <code>int_rate</code>, <code>installment</code></td>
+<td>Variables comerciales derivadas del modelo existente de la plataforma; excluidas en pre-aprobación estricta para evaluar riesgo intrínseco.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>4. Hipótesis explícitas de riesgo de negocio formuladas a priori</h3>
+<ol>
+    <li><strong>Hipótesis 1 (Capacidad de pago y sobreendeudamiento - DTI):</strong> A mayor relación deuda-ingreso (<code>dti</code>), mayor será la probabilidad de incumplimiento ($PD$), debido a la menor holgura financiera del solicitante ante choques de liquidez.</li>
+    <li><strong>Hipótesis 2 (Indagaciones recientes de liquidez):</strong> Un alto número de consultas en el buró de crédito en los últimos 6 meses (<code>inq_last_6mths</code>) se asocia con un mayor riesgo de impago, reflejando búsqueda desesperada de liquidez en múltiples entidades.</li>
+    <li><strong>Hipótesis 3 (Estrés en líneas rotativas):</strong> Niveles elevados de utilización en tarjetas de crédito (<code>revol_util &gt; 80%</code>) incrementan significativamente la probabilidad de default frente a solicitantes con baja utilización.</li>
+    <li><strong>Hipótesis 4 (Estabilidad laboral):</strong> Prestatarios con menor antigüedad en el empleo (<code>emp_length &lt; 1 year</code>) presentan una tasa de default superior frente a solicitantes consolidados con más de 10 años de estabilidad laboral.</li>
+    <li><strong>Hipótesis 5 (Monto financiado y severidad):</strong> Montos de crédito elevados (<code>funded_amnt</code>) no solo incrementan la exposición ($EAD$), sino que exhiben una menor tasa de recuperación post-default (mayor $LGD$).</li>
+</ol>
+</div>
+</details>
+
+<details class="teoria" id="metodo-variables-objetivo">
+<summary><span>Variables objetivo (PD y LGD) y dinámica temporal</span></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección define las variables de salida modeladas (PD como clasificación binaria y LGD como
+regresión acotada en $[0, 1]$), justifica la exclusión de préstamos indeterminados y demuestra
+empíricamente la presencia de sesgo de madurez en las particiones temporales.</p>
+</blockquote>
+
+<h3>1. Probabilidad de Incumplimiento (PD): clasificación binaria</h3>
+<p>La probabilidad de incumplimiento ($PD$) modela la verosimilitud de que un cliente caiga en cesación definitiva de pagos durante el ciclo de vida del crédito. A partir de <code>loan_status</code>, se construyó la etiqueta binaria:</p>
+<div class="eq">$$y_i = \begin{cases}
+0, & \text{si } \text{loan\_status}_i \in \{\text{'Fully Paid'}, \text{'Does not meet the credit policy. Status:Fully Paid'}\} \\
+1, & \text{si } \text{loan\_status}_i \in \{\text{'Charged Off'}, \text{'Default'}, \text{'Late (31-120 days)'}, \text{'Does not meet the credit policy. Status:Charged Off'}\} \\
+\text{NA}, & \text{si } \text{loan\_status}_i \in \{\text{'Current'}, \text{'Issued'}, \text{'In Grace Period'}, \text{'Late (16-30 days)'}\}
+\end{cases}$$</div>
+
+<p><strong>Exclusión de indeterminados:</strong> Los créditos con desenlace incierto suman <strong>618.849 registros (69,74 % del dataset original)</strong> y se excluyen del entrenamiento y evaluación porque asignarles arbitrariamente 0 o 1 falsearía la probabilidad empírica. Quedan <strong>268.530 créditos resueltos</strong>, con una <strong>tasa global de default del 21,90 %</strong> (209.711 buenos pagadores vs 58.819 incumplidos).</p>
+
+<div class="tabla">
+<table>
+<thead>
+<tr>
+<th>Partición</th>
+<th>Esquema</th>
+<th>Registros Totales</th>
+<th>Tasa de Default ($PD$ Media)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Train</strong></td>
+<td>Temporal (2007–2013)</td>
+<td>163.541</td>
+<td><strong>19,28 %</strong></td>
+</tr>
+<tr>
+<td><strong>Validation</strong></td>
+<td>Temporal (2014)</td>
+<td>74.154</td>
+<td><strong>26,22 %</strong></td>
+</tr>
+<tr>
+<td><strong>Test</strong></td>
+<td>Temporal (2015)</td>
+<td>30.835</td>
+<td><strong>25,46 %</strong></td>
+</tr>
+<tr>
+<td><strong>Train</strong></td>
+<td>Aleatorio (70 %)</td>
+<td>187.971</td>
+<td><strong>21,90 %</strong></td>
+</tr>
+<tr>
+<td><strong>Validation</strong></td>
+<td>Aleatorio (15 %)</td>
+<td>40.279</td>
+<td><strong>21,90 %</strong></td>
+</tr>
+<tr>
+<td><strong>Test</strong></td>
+<td>Aleatorio (15 %)</td>
+<td>40.280</td>
+<td><strong>21,90 %</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>2. Pérdida Dado el Incumplimiento (LGD): regresión acotada</h3>
+<p>Para el universo de créditos que fallaron ($y_i = 1$, con $N = 58.819$ créditos), el banco recupera una parte del capital a través de cobranza extrajudicial o remate de cartera. La severidad o fracción no recuperada corresponde a la $LGD \in [0, 1]$. Se adoptó la <strong>Opción A</strong> (coherente con admisión), donde tanto $LGD$ como la exposición $EAD$ comparten la base contractual del desembolso:</p>
+<div class="eq">$$\text{EAD}_i = \text{funded\_amnt}_i$$</div>
+<div class="eq">$$\text{pérdida}_i = \text{funded\_amnt}_i - \text{total\_rec\_prncp}_i - (\text{recoveries}_i - \text{collection\_recovery\_fee}_i)$$</div>
+<div class="eq">$$\text{LGD}_i = \max\left(0, \min\left(1, \frac{\text{pérdida}_i}{\text{funded\_amnt}_i}\right)\right)$$</div>
+
+<p><strong>Parámetros descriptivos de LGD:</strong></p>
+<ul>
+    <li><strong>Media:</strong> $0{,}7042$ ($70{,}42 \%$).</li>
+    <li><strong>Mediana:</strong> $0{,}7501$ ($75{,}01 \%$).</li>
+    <li><strong>Desviación estándar:</strong> $0{,}2048$.</li>
+    <li><strong>LGD = 0,0 (recuperación total):</strong> $0{,}08 \%$ de las observaciones.</li>
+    <li><strong>LGD = 1,0 (pérdida total sin cobranza):</strong> $0{,}61 \%$ de las observaciones.</li>
+</ul>
+
+<figure>
+<img alt="Distribución empírica de LGD" src="results/figures/distribucion_lgd.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Distribución empírica de LGD:</em> marcada bimodalidad con concentración entre 0,6 y 0,9.</figcaption>
+</figure>
+
+<h3>3. Dinámica temporal y sesgo de madurez (Maturity Bias)</h3>
+<p>La tasa observada de mora varía notablemente según el año de originación:</p>
+<figure>
+<img alt="Tasa de default por año" src="results/figures/tasa_default_por_anio.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Tasa de incumplimiento observada según año de originación.</em></figcaption>
+</figure>
+
+<p>Al analizar el dataset crudo frente a los créditos resueltos, se evidencia la presencia masiva de créditos no madurados:</p>
+<figure>
+<img alt="Sesgo de madurez en Lending Club" src="results/figures/sesgo_madurez.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Composición de cartera resuelta vs vigente por año de originación.</em></figcaption>
+</figure>
+
+<ul>
+    <li>En <strong>2011</strong>, más del $90 \%$ de los créditos completaron su ciclo.</li>
+    <li>En <strong>2014</strong>, el $67{,}29 \%$ de los préstamos seguían vigentes (<code>Current</code>).</li>
+    <li>En <strong>2015</strong>, el <strong>$89{,}66 \%$</strong> ($377.553$ créditos) se encontraban vigentes al momento de extracción.</li>
+</ul>
+
+<blockquote>
+<p><strong>Impacto clave para la sustentación:</strong> Los únicos créditos resueltos observables de la cohorte 2015 son aquellos que entraron en default acelerado en sus primeros meses de vida. Los buenos pagadores a 36 y 60 meses aún no habían concluido sus amortizaciones. Este fenómeno de <strong>censura por derecha</strong> explica por qué la partición temporal de Test 2015 presenta una tasa de default aparentemente más alta ($25{,}46 \%$) y una LGD empírica severamente más elevada ($90{,}5 \%$, visible en la Figura de LGD anual), aspecto clave del análisis temporal.</p>
+</blockquote>
+
+<figure>
+<img alt="LGD media por año de originación" src="results/figures/lgd_media_por_anio.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Evolución de la LGD media según año de originación: ascenso abrupto en 2014-2015 por censura de cobranza.</em></figcaption>
+</figure>
+
+<figure>
+<img alt="EAD medio por año de originación" src="results/figures/ead_medio_por_anio.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Exposición media al momento del incumplimiento (EAD) por año.</em></figcaption>
+</figure>
+</div>
+</details>
+
+<details class="teoria" id="metodo-perdida-esperada">
+<summary><span>Pérdida esperada (Expected Loss) y marco regulatorio</span></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección formula el cálculo integral de Pérdida Esperada ($E[L]$) bajo estándares de Basilea II y III,
+evaluando la cartera de prueba temporal de 2015 con estimadores base y comparándolos con las
+predicciones individualizadas de las redes neuronales.</p>
+</blockquote>
+
+<h3>1. Fundamentación teórica y marco regulatorio de Basilea</h3>
+<p>Bajo las directrices del Comité de Supervisión Bancaria de Basilea, el riesgo crediticio se cuantifica combinando tres dimensiones complementarias:</p>
+<ol>
+    <li><strong>Probabilidad de Incumplimiento ($PD$):</strong> Verosimilitud de impago del acreditado.</li>
+    <li><strong>Severidad o Pérdida Dado el Incumplimiento ($LGD$):</strong> Fracción no recuperada del crédito.</li>
+    <li><strong>Exposición al Incumplimiento ($EAD$):</strong> Monto en riesgo al momento del impago.</li>
+</ol>
+
+<p>La <strong>Pérdida Esperada ($E[L]$)</strong> representa el costo operativo ordinario del negocio y define las provisiones contables que la entidad debe constituir:</p>
+<div class="eq">$$E[L]_i = PD_i \times LGD_i \times EAD_i$$</div>
+<div class="eq">$$E[L]_{\text{cartera}} = \sum_{i=1}^N PD_i \times LGD_i \times EAD_i, \qquad \text{Tasa } E[L] = \frac{E[L]_{\text{cartera}}}{\sum_{i=1}^N EAD_i}$$</div>
+
+<h3>2. Resultados del baseline estadístico naive (Prueba Temporal 2015)</h3>
+<p>Como cota de referencia previa a las redes neuronales, se evaluó la cartera de prueba temporal ($N = 30.835$ créditos resueltos de 2015) con estimadores <em>naive</em> basados en medias históricas:</p>
+<ul>
+    <li><strong>Exposición total de la cartera ($EAD$):</strong> <strong>$452.036.160{,}00\text{ USD}$</strong></li>
+    <li><strong>Pérdida esperada agregada ($E[L]_{\text{total}}$):</strong> <strong>$70.749.712{,}00\text{ USD}$</strong></li>
+    <li><strong>Tasa de pérdida esperada de cartera:</strong> <strong>$15{,}65 \%$</strong></li>
+    <li><strong>Pérdida esperada promedio por crédito:</strong> $2.294{,}46\text{ USD}$ (mediana: $1.960{,}33\text{ USD}$)</li>
+</ul>
+
+<h3>3. Distribución empírica de la pérdida esperada</h3>
+<figure>
+<img alt="Distribución empírica de la Pérdida Esperada individual" src="results/figures/distribucion_el.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Distribución individual de E[L]:</em> marcada asimetría hacia la derecha (la mayoría de créditos presentan pérdidas esperadas inferiores a $3.000 USD, con una cola de alta exposición).</figcaption>
+</figure>
+
+<figure>
+<img alt="Pérdida esperada por rango de PD" src="results/figures/el_por_rango_pd.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Pérdida esperada agregada por decil de PD:</em> relación monótona creciente esperada entre riesgo y provisión requerida.</figcaption>
+</figure>
+
+<h3>4. Interpretación de negocio y ventaja del scoring individualizado</h3>
+<p>La entidad originadora debe constituir una reserva mínima de <strong>$70{,}75\text{ millones de USD}$</strong> para respaldar la cartera colocada en 2015 bajo medias históricas. Cuando se sustituyen las tasas promedio por las predicciones de las redes neuronales desarrolladas, la institución discrimina con alta precisión qué solicitantes concentran el riesgo monetario, permitiendo racionalizar el capital, optimizar la admisión y ajustar las tasas de interés ofrecidas.</p>
+</div>
+</details>
+<!-- metodo:detalles:fin -->
+            </div>
+
         </section>
         <section class="wrap section" id="fundamentos">
             <div class="section-head">
@@ -897,422 +1154,222 @@
                 <p>Derivaciones completas del reporte técnico. Despliega un tema para leerlo.</p>
             </div>
 <!-- teoria:inicio -->
-<!-- P2 teoria-neurona-mlp:inicio -->
-<details class="teoria p2-informe" id="teoria-neurona-mlp">
-  <summary><span>Neurona artificial, MLP y activaciones</span><small>Sebastián Villegas · P2</small></summary>
-  <div class="prosa">
-<blockquote>
-<p>Esta sección formaliza la neurona artificial, la propagación hacia
-adelante de un perceptrón multicapa (MLP) y las funciones de activación
-disponibles en el núcleo implementado por P2. Se ilustra con la
-arquitectura PD escogida a partir de la búsqueda de hiperparámetros. La
-derivación probabilística de las pérdidas está en la sección 3.3; la
-retropropagación, en la 3.4; y las ecuaciones de Adam y la
-regularización, en la 3.5. La numeración de figuras y tablas es
-provisional hasta la integración del informe.</p>
-</blockquote>
-<hr />
-<h2 id="p2-mlp-la-neurona-artificial-como-función-parametrizada">1. La neurona
-artificial como función parametrizada</h2>
-<p>Una <strong>neurona artificial</strong> calcula una combinación afín
-de sus entradas y aplica una función de activación. Para un vector de
-características
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>𝐱</mi><mo>=</mo><msup><mrow><mo stretchy="true" form="prefix">(</mo><msub><mi>x</mi><mn>1</mn></msub><mo>,</mo><mi>…</mi><mo>,</mo><msub><mi>x</mi><mi>d</mi></msub><mo stretchy="true" form="postfix">)</mo></mrow><mi>𝖳</mi></msup><mo>∈</mo><msup><mi>ℝ</mi><mi>d</mi></msup></mrow><annotation encoding="application/x-tex">\mathbf{x}=(x_1,\ldots,x_d)^\mathsf{T}\in\mathbb{R}^{d}</annotation></semantics></math>:</p>
-<div class="p2-equation"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>z</mi><mo>=</mo><munderover><mo>∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>d</mi></munderover><msub><mi>w</mi><mi>j</mi></msub><msub><mi>x</mi><mi>j</mi></msub><mo>+</mo><mi>b</mi><mo>=</mo><msup><mi>𝐰</mi><mi>𝖳</mi></msup><mi>𝐱</mi><mo>+</mo><mi>b</mi><mo>,</mo><mspace width="2.0em"></mspace><mi>a</mi><mo>=</mo><mi>ϕ</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
-z=\sum_{j=1}^{d}w_jx_j+b=\mathbf{w}^\mathsf{T}\mathbf{x}+b,
-\qquad a=\phi(z).
-</annotation></semantics></math></div>
-<p>Aquí
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>w</mi><mi>j</mi></msub><annotation encoding="application/x-tex">w_j</annotation></semantics></math>
-es el peso de la característica
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>x</mi><mi>j</mi></msub><annotation encoding="application/x-tex">x_j</annotation></semantics></math>,
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>b</mi><annotation encoding="application/x-tex">b</annotation></semantics></math>
-es el <strong>sesgo</strong>,
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>z</mi><annotation encoding="application/x-tex">z</annotation></semantics></math>
-es la entrada neta o <em>preactivación</em>,
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>ϕ</mi><annotation encoding="application/x-tex">\phi</annotation></semantics></math>
-es la función de activación y
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>a</mi><annotation encoding="application/x-tex">a</annotation></semantics></math>
-es la salida de la neurona. El aprendizaje modifica los parámetros
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>𝐰</mi><annotation encoding="application/x-tex">\mathbf{w}</annotation></semantics></math>
-y
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>b</mi><annotation encoding="application/x-tex">b</annotation></semantics></math>
-para reducir una función de pérdida.</p>
-<p>Por ejemplo, si
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>𝐱</mi><mo>=</mo><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mn>5</mn><mo>,</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">\mathbf{x}=(0{,}5,1)</annotation></semantics></math>,
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>𝐰</mi><mo>=</mo><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mn>8</mn><mo>,</mo><mi>−</mi><mn>0</mn><mo>,</mo><mn>3</mn><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">\mathbf{w}=(0{,}8,-0{,}3)</annotation></semantics></math>
-y
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>b</mi><mo>=</mo><mn>0</mn><mo>,</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">b=0{,}1</annotation></semantics></math>,
-entonces
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>z</mi><mo>=</mo><mn>0</mn><mo>,</mo><mn>8</mn><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mn>5</mn><mo stretchy="true" form="postfix">)</mo></mrow><mo>−</mo><mn>0</mn><mo>,</mo><mn>3</mn><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow><mo>+</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>=</mo><mn>0</mn><mo>,</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">z=0{,}8(0{,}5)-0{,}3(1)+0{,}1=0{,}2</annotation></semantics></math>.
-Con activación ReLU, la neurona entrega
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>a</mi><mo>=</mo><mo>max</mo><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mn>0</mn><mo>,</mo><mn>2</mn><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>0</mn><mo>,</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">a=\max(0,0{,}2)=0{,}2</annotation></semantics></math>.
-Este ejemplo ilustra el cálculo; los valores <strong>no</strong>
-corresponden a pesos aprendidos por el modelo real.</p>
-<p>La transformación afín es diferenciable respecto a sus
-parámetros:</p>
-<div class="p2-equation"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mfrac><mrow><mi>∂</mi><mi>z</mi></mrow><mrow><mi>∂</mi><msub><mi>w</mi><mi>j</mi></msub></mrow></mfrac><mo>=</mo><msub><mi>x</mi><mi>j</mi></msub><mo>,</mo><mspace width="2.0em"></mspace><mfrac><mrow><mi>∂</mi><mi>z</mi></mrow><mrow><mi>∂</mi><mi>b</mi></mrow></mfrac><mo>=</mo><mn>1</mn><mo>,</mo><mspace width="2.0em"></mspace><mfrac><mrow><mi>∂</mi><mi>z</mi></mrow><mrow><mi>∂</mi><msub><mi>x</mi><mi>j</mi></msub></mrow></mfrac><mo>=</mo><msub><mi>w</mi><mi>j</mi></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
-\frac{\partial z}{\partial w_j}=x_j,
-\qquad \frac{\partial z}{\partial b}=1,
-\qquad \frac{\partial z}{\partial x_j}=w_j.
-</annotation></semantics></math></div>
-<p>Estas identidades permiten calcular los gradientes durante la
-retropropagación (sección 3.4).</p>
-<h2 id="p2-mlp-del-perceptrón-a-un-mlp">2. Del perceptrón a un MLP</h2>
-<p>Un perceptrón multicapa (<em>multilayer perceptron</em>,
-<strong>MLP</strong>) conecta varias capas de neuronas. La primera
-recibe las variables de entrada, las intermedias calculan
-representaciones ocultas y la última entrega la predicción. Para la capa
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mo>ℓ</mo><annotation encoding="application/x-tex">\ell</annotation></semantics></math>:</p>
-<div class="p2-equation"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>𝐚</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo>=</mo><mi>𝐱</mi><mo>,</mo><mspace width="2.0em"></mspace><msup><mi>𝐳</mi><mrow><mo stretchy="true" form="prefix">(</mo><mo>ℓ</mo><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo>=</mo><msup><mi>W</mi><mrow><mo stretchy="true" form="prefix">(</mo><mo>ℓ</mo><mo stretchy="true" form="postfix">)</mo></mrow></msup><msup><mi>𝐚</mi><mrow><mo stretchy="true" form="prefix">(</mo><mo>ℓ</mo><mo>−</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo>+</mo><msup><mi>𝐛</mi><mrow><mo stretchy="true" form="prefix">(</mo><mo>ℓ</mo><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo>,</mo><mspace width="2.0em"></mspace><msup><mi>𝐚</mi><mrow><mo stretchy="true" form="prefix">(</mo><mo>ℓ</mo><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo>=</mo><msub><mi>ϕ</mi><mo>ℓ</mo></msub><mspace width="-0.167em"></mspace><mrow><mo stretchy="true" form="prefix">(</mo><msup><mi>𝐳</mi><mrow><mo stretchy="true" form="prefix">(</mo><mo>ℓ</mo><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow><mi>.</mi></mrow><annotation encoding="application/x-tex">
-\mathbf{a}^{(0)}=\mathbf{x},\qquad
-\mathbf{z}^{(\ell)}=W^{(\ell)}\mathbf{a}^{(\ell-1)}+\mathbf{b}^{(\ell)},\qquad
-\mathbf{a}^{(\ell)}=\phi_{\ell}\!\left(\mathbf{z}^{(\ell)}\right).
-</annotation></semantics></math></div>
-<p>Si la capa anterior tiene
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>n</mi><mrow><mo>ℓ</mo><mo>−</mo><mn>1</mn></mrow></msub><annotation encoding="application/x-tex">n_{\ell-1}</annotation></semantics></math>
-unidades y la actual tiene
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>n</mi><mo>ℓ</mo></msub><annotation encoding="application/x-tex">n_{\ell}</annotation></semantics></math>,
-entonces
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>W</mi><mrow><mo stretchy="true" form="prefix">(</mo><mo>ℓ</mo><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo>∈</mo><msup><mi>ℝ</mi><mrow><msub><mi>n</mi><mo>ℓ</mo></msub><mo>×</mo><msub><mi>n</mi><mrow><mo>ℓ</mo><mo>−</mo><mn>1</mn></mrow></msub></mrow></msup></mrow><annotation encoding="application/x-tex">W^{(\ell)}\in\mathbb{R}^{n_{\ell}\times n_{\ell-1}}</annotation></semantics></math>
-y
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>𝐛</mi><mrow><mo stretchy="true" form="prefix">(</mo><mo>ℓ</mo><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo>∈</mo><msup><mi>ℝ</mi><msub><mi>n</mi><mo>ℓ</mo></msub></msup></mrow><annotation encoding="application/x-tex">\mathbf{b}^{(\ell)}\in\mathbb{R}^{n_{\ell}}</annotation></semantics></math>.
-Las activaciones se aplican elemento a elemento.</p>
-<p><strong>Por qué son necesarias las no linealidades.</strong> Si todas
-las capas usaran
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>ϕ</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mi>z</mi></mrow><annotation encoding="application/x-tex">\phi(z)=z</annotation></semantics></math>,
-dos capas sucesivas producirían</p>
-<div class="p2-equation"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>W</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup><mrow><mo stretchy="true" form="prefix">(</mo><msup><mi>W</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup><mi>𝐱</mi><mo>+</mo><msup><mi>𝐛</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow><mo>+</mo><msup><mi>𝐛</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo>=</mo><munder><munder><mrow><msup><mi>W</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup><msup><mi>W</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup></mrow><mo accent="true">⏟</mo></munder><mover><mi>W</mi><mo accent="true">̃</mo></mover></munder><mi>𝐱</mi><mo>+</mo><munder><munder><mrow><msup><mi>W</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup><msup><mi>𝐛</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo>+</mo><msup><mi>𝐛</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup></mrow><mo accent="true">⏟</mo></munder><mover><mi>𝐛</mi><mo accent="true">̃</mo></mover></munder><mi>.</mi></mrow><annotation encoding="application/x-tex">
-W^{(2)}(W^{(1)}\mathbf{x}+\mathbf{b}^{(1)})+\mathbf{b}^{(2)}
-=\underbrace{W^{(2)}W^{(1)}}_{\widetilde W}\mathbf{x}
-+\underbrace{W^{(2)}\mathbf{b}^{(1)}+\mathbf{b}^{(2)}}_{\widetilde{\mathbf b}}.
-</annotation></semantics></math></div>
-<p>Es decir, cualquier cadena exclusivamente afín equivale a <strong>una
-sola transformación afín</strong>. Al introducir ReLU, tanh o sigmoide
-en capas ocultas, el MLP puede representar relaciones no lineales que
-una regresión lineal no expresa de ese modo.</p>
-<p>En el repositorio, <code>src/models/mlp.py</code> contiene el MLP
-configurable y <code>build_mlp</code> construye la red a partir del
-número y tamaño de capas, la activación y el dropout. Ese diseño es
-reutilizable por las tareas PD y LGD, aunque sus salidas y objetivos
-estadísticos son diferentes.</p>
-<h2 id="p2-mlp-arquitectura-del-clasificador-pd-del-proyecto">3. Arquitectura
-del clasificador PD del proyecto</h2>
-<p>El preprocesamiento de P1 entrega <strong>82 características
-transformadas por observación</strong>. No se deben confundir con el
-número de campos originales del formulario de la aplicación: el vector
-de entrada del modelo contiene características ya codificadas y
-transformadas. Para la configuración PD seleccionada, la arquitectura es
-<strong>82–64–32–1</strong>:</p>
-<figure>
-<img src="data:image/png;base64,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+eJpTi0REREREdGVi8EiIiIiIiIpg4ODSMnIRUpGrsLntbS0cOPVG7A8LHiKUzYziRqb8duxKKXP29vZ4s+P3A09PXZtiIiIiIiIxos9KiIiIiIiKU8/fBfSs/NRUFyKltZ2tHd0Qk9XF1aW5vCd544NK5fAycFuupM5I6xetgjGRobIzC1ETV0D2to70NPbB1MTIzg7zsWiBf5YtXQhdHXZrSEiIiIiIpoIraGhoaHpTgQRERERERERERERERFND+3pTgARERERERERERERERFNHwaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGYwBouIiIiIiIiIiIiIiIhmMAaLiIiIiIiIiIiIiIiIZjAGi4iIiIiIiIiIiIiIiGaw/weDUhj8lFVw3gAAAABJRU5ErkJggg=="
-alt="Arquitectura del MLP PD: 82 entradas, 64 y 32 neuronas ocultas, y un logit de salida." />
-<figcaption aria-hidden="true">Arquitectura del MLP PD: 82 entradas, 64
-y 32 neuronas ocultas, y un logit de salida.</figcaption>
-</figure>
-<p><em>Figura 3.2.1.</em> Arquitectura seleccionada para PD. ReLU en las
-dos capas ocultas; un logit en la salida y sigmoide únicamente para
-convertirlo en probabilidad. <em>Fuente:</em> elaboración propia a
-partir de <code>configs/pd_mlp.yaml</code> y
-<code>src/models/mlp.py</code>.</p>
-<p>La propagación hacia adelante queda dada por:</p>
-<div class="p2-equation"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mtable><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>𝐡</mi><mn>1</mn></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>=</mo><mo>ReLU</mo><mrow><mo stretchy="true" form="prefix">(</mo><msup><mi>W</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup><mi>𝐱</mi><mo>+</mo><msup><mi>𝐛</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo></mtd><mtd columnalign="right" style="text-align: right"></mtd><mtd columnalign="left" style="text-align: left"><msub><mi>𝐡</mi><mn>1</mn></msub><mo>∈</mo><msup><mi>ℝ</mi><mn>64</mn></msup><mo>,</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><msub><mi>𝐡</mi><mn>2</mn></msub></mtd><mtd columnalign="left" style="text-align: left"><mo>=</mo><mo>ReLU</mo><mrow><mo stretchy="true" form="prefix">(</mo><msup><mi>W</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup><msub><mi>𝐡</mi><mn>1</mn></msub><mo>+</mo><msup><mi>𝐛</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>2</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow><mo>,</mo></mtd><mtd columnalign="right" style="text-align: right"></mtd><mtd columnalign="left" style="text-align: left"><msub><mi>𝐡</mi><mn>2</mn></msub><mo>∈</mo><msup><mi>ℝ</mi><mn>32</mn></msup><mo>,</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><mi>z</mi></mtd><mtd columnalign="left" style="text-align: left"><mo>=</mo><msup><mi>W</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>3</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup><msub><mi>𝐡</mi><mn>2</mn></msub><mo>+</mo><msup><mi>b</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>3</mn><mo stretchy="true" form="postfix">)</mo></mrow></msup><mo>,</mo></mtd><mtd columnalign="right" style="text-align: right"></mtd><mtd columnalign="left" style="text-align: left"><mi>z</mi><mo>∈</mo><mi>ℝ</mi><mo>,</mo></mtd></mtr><mtr><mtd columnalign="right" style="text-align: right"><mover><mi>p</mi><mo accent="true">̂</mo></mover></mtd><mtd columnalign="left" style="text-align: left"><mo>=</mo><mi>σ</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mfrac><mn>1</mn><mrow><mn>1</mn><mo>+</mo><msup><mi>e</mi><mrow><mi>−</mi><mi>z</mi></mrow></msup></mrow></mfrac><mo>,</mo></mtd><mtd columnalign="right" style="text-align: right"></mtd><mtd columnalign="left" style="text-align: left"><mn>0</mn><mo>&lt;</mo><mover><mi>p</mi><mo accent="true">̂</mo></mover><mo>&lt;</mo><mn>1</mn><mi>.</mi></mtd></mtr></mtable><annotation encoding="application/x-tex">
-\begin{aligned}
-\mathbf{h}_1 &amp;= \operatorname{ReLU}(W^{(1)}\mathbf{x}+\mathbf{b}^{(1)}), &amp;&amp;\mathbf{h}_1\in\mathbb{R}^{64},\\
-\mathbf{h}_2 &amp;= \operatorname{ReLU}(W^{(2)}\mathbf{h}_1+\mathbf{b}^{(2)}), &amp;&amp;\mathbf{h}_2\in\mathbb{R}^{32},\\
-z &amp;= W^{(3)}\mathbf{h}_2+b^{(3)}, &amp;&amp;z\in\mathbb{R},\\
-\widehat p &amp;= \sigma(z)=\frac{1}{1+e^{-z}}, &amp;&amp;0&lt;\widehat p&lt;1.
-\end{aligned}
-</annotation></semantics></math></div>
-<p>En PD,
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mover><mi>p</mi><mo accent="true">̂</mo></mover><annotation encoding="application/x-tex">\widehat p</annotation></semantics></math>
-representa la probabilidad estimada de incumplimiento. Durante el
-entrenamiento se usa el <strong>logit
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>z</mi><annotation encoding="application/x-tex">z</annotation></semantics></math>
-directamente</strong> en <code>BCEWithLogitsLoss</code>; no debe
-aplicarse sigmoide antes de esa pérdida, pues la función ya incorpora la
-transformación de manera numéricamente estable. Para inferencia,
-<code>predict_pd</code> sí convierte el logit en probabilidad.</p>
-<h3 id="p2-mlp-conteo-exacto-de-parámetros">3.1 Conteo exacto de
-parámetros</h3>
-<p>Cada capa totalmente conectada tiene
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>n</mi><mrow><mi mathvariant="normal">s</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">l</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">a</mi></mrow></msub><msub><mi>n</mi><mrow><mi mathvariant="normal">e</mi><mi mathvariant="normal">n</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">a</mi></mrow></msub></mrow><annotation encoding="application/x-tex">n_{\mathrm{salida}}n_{\mathrm{entrada}}</annotation></semantics></math>
-pesos y
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>n</mi><mrow><mi mathvariant="normal">s</mi><mi mathvariant="normal">a</mi><mi mathvariant="normal">l</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">d</mi><mi mathvariant="normal">a</mi></mrow></msub><annotation encoding="application/x-tex">n_{\mathrm{salida}}</annotation></semantics></math>
-sesgos. Por tanto:</p>
-<table>
-<thead>
-<tr class="header">
-<th style="text-align: left;">Capa</th>
-<th style="text-align: left;">Matriz de pesos</th>
-<th style="text-align: right;">Pesos</th>
-<th style="text-align: right;">Sesgos</th>
-<th style="text-align: right;">Total</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">Entrada
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mo>→</mo><annotation encoding="application/x-tex">\to</annotation></semantics></math>
-oculta 1</td>
-<td
-style="text-align: left;"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>64</mn><mo>×</mo><mn>82</mn></mrow><annotation encoding="application/x-tex">64\times82</annotation></semantics></math></td>
-<td style="text-align: right;">5.248</td>
-<td style="text-align: right;">64</td>
-<td style="text-align: right;">5.312</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">Oculta 1
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mo>→</mo><annotation encoding="application/x-tex">\to</annotation></semantics></math>
-oculta 2</td>
-<td
-style="text-align: left;"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>32</mn><mo>×</mo><mn>64</mn></mrow><annotation encoding="application/x-tex">32\times64</annotation></semantics></math></td>
-<td style="text-align: right;">2.048</td>
-<td style="text-align: right;">32</td>
-<td style="text-align: right;">2.080</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">Oculta 2
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mo>→</mo><annotation encoding="application/x-tex">\to</annotation></semantics></math>
-salida</td>
-<td
-style="text-align: left;"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mo>×</mo><mn>32</mn></mrow><annotation encoding="application/x-tex">1\times32</annotation></semantics></math></td>
-<td style="text-align: right;">32</td>
-<td style="text-align: right;">1</td>
-<td style="text-align: right;">33</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;"><strong>Total</strong></td>
-<td style="text-align: left;">—</td>
-<td style="text-align: right;"><strong>7.328</strong></td>
-<td style="text-align: right;"><strong>97</strong></td>
-<td style="text-align: right;"><strong>7.425</strong></td>
-</tr>
-</tbody>
-</table>
-<p><em>Tabla 3.2.1.</em> Parámetros entrenables de la arquitectura PD.
-<em>Fuente:</em> cálculo propio a partir de las dimensiones de las
-capas, verificable con
-<code>sum(p.numel() for p in model.parameters() if p.requires_grad)</code>.</p>
-<p>El número de parámetros no equivale al número de observaciones. En
-este caso, las particiones temporales de PD contienen <strong>163.541
-ejemplos de entrenamiento</strong>, <strong>74.154 de
-validación</strong> y <strong>30.835 de prueba</strong>; su construcción
-y la prevención de fuga de información son responsabilidad de la sección
-de datos.</p>
-<h2 id="p2-mlp-funciones-de-activación-utilizadas-o-disponibles">4. Funciones
-de activación utilizadas o disponibles</h2>
-<p>El núcleo desarrollado permite usar <strong>ReLU, tangente
-hiperbólica (tanh) y sigmoide</strong>. Su papel depende de la capa y de
-la tarea. La activación seleccionada en las capas ocultas del
-clasificador PD final es <strong>ReLU</strong>. La sigmoide se utiliza
-para interpretar el logit PD como probabilidad; para LGD se contempla
-una salida acotada, cuya elección se documenta en las secciones 3.3 y
-6.</p>
-<h3 id="p2-mlp-relu-unidad-lineal-rectificada">4.1 ReLU: unidad lineal
-rectificada</h3>
-<div class="p2-equation"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>ReLU</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mo>max</mo><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mrow><mo stretchy="true" form="prefix">{</mo><mtable><mtr><mtd columnalign="left" style="text-align: left"><mn>0</mn><mo>,</mo></mtd><mtd columnalign="left" style="text-align: left"><mi>z</mi><mo>≤</mo><mn>0</mn><mo>,</mo></mtd></mtr><mtr><mtd columnalign="left" style="text-align: left"><mi>z</mi><mo>,</mo></mtd><mtd columnalign="left" style="text-align: left"><mi>z</mi><mo>&gt;</mo><mn>0</mn><mi>.</mi></mtd></mtr></mtable></mrow></mrow><annotation encoding="application/x-tex">
-\operatorname{ReLU}(z)=\max(0,z)=
-\begin{cases}0,&amp;z\leq0,\\z,&amp;z&gt;0.\end{cases}
-</annotation></semantics></math></div>
-<p>Su derivada clásica existe salvo en
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>z</mi><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">z=0</annotation></semantics></math>:</p>
-<div class="p2-equation"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>ReLU</mo><mi>′</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mrow><mo stretchy="true" form="prefix">{</mo><mtable><mtr><mtd columnalign="left" style="text-align: left"><mn>0</mn><mo>,</mo></mtd><mtd columnalign="left" style="text-align: left"><mi>z</mi><mo>&lt;</mo><mn>0</mn><mo>,</mo></mtd></mtr><mtr><mtd columnalign="left" style="text-align: left"><mn>1</mn><mo>,</mo></mtd><mtd columnalign="left" style="text-align: left"><mi>z</mi><mo>&gt;</mo><mn>0</mn><mi>.</mi></mtd></mtr></mtable></mrow></mrow><annotation encoding="application/x-tex">
-\operatorname{ReLU}&#39;(z)=
-\begin{cases}0,&amp;z&lt;0,\\1,&amp;z&gt;0.\end{cases}
-</annotation></semantics></math></div>
-<p>En el punto
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>z</mi><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">z=0</annotation></semantics></math>,
-PyTorch utiliza por convención el valor de gradiente <strong>0</strong>.
-Para
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>z</mi><mo>&gt;</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">z&gt;0</annotation></semantics></math>,
-la derivada es constante y no introduce por sí misma un factor pequeño
-en el gradiente. Para
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>z</mi><mo>&lt;</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">z&lt;0</annotation></semantics></math>,
-el gradiente local es cero; esa es la contrapartida de su simplicidad
-computacional.</p>
-<h3 id="p2-mlp-sigmoide-logística">4.2 Sigmoide logística</h3>
-<div class="p2-equation"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>σ</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mfrac><mn>1</mn><mrow><mn>1</mn><mo>+</mo><msup><mi>e</mi><mrow><mi>−</mi><mi>z</mi></mrow></msup></mrow></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
-\sigma(z)=\frac{1}{1+e^{-z}}.
-</annotation></semantics></math></div>
-<p>Derivando con la regla de la cadena:</p>
-<div class="p2-equation"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>σ</mi><mi>′</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mfrac><msup><mi>e</mi><mrow><mi>−</mi><mi>z</mi></mrow></msup><msup><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo>+</mo><msup><mi>e</mi><mrow><mi>−</mi><mi>z</mi></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow><mn>2</mn></msup></mfrac><mo>=</mo><mfrac><mn>1</mn><mrow><mn>1</mn><mo>+</mo><msup><mi>e</mi><mrow><mi>−</mi><mi>z</mi></mrow></msup></mrow></mfrac><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo>−</mo><mfrac><mn>1</mn><mrow><mn>1</mn><mo>+</mo><msup><mi>e</mi><mrow><mi>−</mi><mi>z</mi></mrow></msup></mrow></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><menclose notation="box"><mrow><mi>σ</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo minsize="1.2" maxsize="1.2" stretchy="false" form="prefix">(</mo><mn>1</mn><mo>−</mo><mi>σ</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo minsize="1.2" maxsize="1.2" stretchy="false" form="postfix">)</mo></mrow></menclose><mi>.</mi></mrow><annotation encoding="application/x-tex">
-\sigma&#39;(z)=\frac{e^{-z}}{(1+e^{-z})^2}
-=\frac{1}{1+e^{-z}}\left(1-\frac{1}{1+e^{-z}}\right)
-=\boxed{\sigma(z)\bigl(1-\sigma(z)\bigr)}.
-</annotation></semantics></math></div>
-<p>Su rango es
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(0,1)</annotation></semantics></math>,
-apropiado para expresar probabilidades. Sin embargo,
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>σ</mi><mi>′</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">\sigma&#39;(z)</annotation></semantics></math>
-tiende a cero cuando
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>z</mi><mo>→</mo><mi>±</mi><mi>∞</mi></mrow><annotation encoding="application/x-tex">z\to\pm\infty</annotation></semantics></math>,
-motivo por el que puede haber <strong>saturación</strong> si se usa
-repetidamente en capas ocultas. En la salida PD,
-<code>BCEWithLogitsLoss</code> combina la sigmoide con la pérdida de
-forma estable y simplifica el gradiente respecto al logit (sección
-3.4).</p>
-<h3 id="p2-mlp-tangente-hiperbólica">4.3 Tangente hiperbólica</h3>
-<div class="p2-equation"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>tanh</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mfrac><mrow><msup><mi>e</mi><mi>z</mi></msup><mo>−</mo><msup><mi>e</mi><mrow><mi>−</mi><mi>z</mi></mrow></msup></mrow><mrow><msup><mi>e</mi><mi>z</mi></msup><mo>+</mo><msup><mi>e</mi><mrow><mi>−</mi><mi>z</mi></mrow></msup></mrow></mfrac><mo>=</mo><mfrac><mrow><mo>sinh</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><mrow><mo>cosh</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
-\tanh(z)=\frac{e^z-e^{-z}}{e^z+e^{-z}}=\frac{\sinh(z)}{\cosh(z)}.
-</annotation></semantics></math></div>
-<p>Aplicando la regla del cociente y la identidad
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mo>cosh</mo><mn>2</mn></msup><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>−</mo><msup><mo>sinh</mo><mn>2</mn></msup><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">\cosh^2(z)-\sinh^2(z)=1</annotation></semantics></math>:</p>
-<div class="p2-equation"><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mfrac><mrow><mi>d</mi><mo>tanh</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><mrow><mi>d</mi><mi>z</mi></mrow></mfrac><mo>=</mo><mfrac><mrow><msup><mo>cosh</mo><mn>2</mn></msup><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo>−</mo><msup><mo>sinh</mo><mn>2</mn></msup><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><mrow><msup><mo>cosh</mo><mn>2</mn></msup><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow></mfrac><mo>=</mo><menclose notation="box"><mrow><mn>1</mn><mo>−</mo><msup><mo>tanh</mo><mn>2</mn></msup><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow></menclose><mi>.</mi></mrow><annotation encoding="application/x-tex">
-\frac{d\tanh(z)}{dz}
-=\frac{\cosh^2(z)-\sinh^2(z)}{\cosh^2(z)}
-=\boxed{1-\tanh^2(z)}.
-</annotation></semantics></math></div>
-<p>Su salida se sitúa en
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mi>−</mi><mn>1</mn><mo>,</mo><mn>1</mn><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(-1,1)</annotation></semantics></math>
-y está centrada alrededor de cero, a diferencia de la sigmoide. También
-presenta saturación en los extremos.</p>
-<h3 id="p2-mlp-comparación-resumida">4.4 Comparación resumida</h3>
-<table>
-<colgroup>
-<col style="width: 25%" />
-<col style="width: 25%" />
-<col style="width: 25%" />
-<col style="width: 25%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: left;">Activación</th>
-<th style="text-align: left;">Expresión</th>
-<th style="text-align: left;">Derivada local</th>
-<th style="text-align: left;">Uso en este trabajo</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">ReLU</td>
-<td
-style="text-align: left;"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>max</mo><mrow><mo stretchy="true" form="prefix">(</mo><mn>0</mn><mo>,</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">\max(0,z)</annotation></semantics></math></td>
-<td
-style="text-align: left;"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mn>0</mn><annotation encoding="application/x-tex">0</annotation></semantics></math>
-o
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mn>1</mn><annotation encoding="application/x-tex">1</annotation></semantics></math>
-(salvo
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>z</mi><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">z=0</annotation></semantics></math>)</td>
-<td style="text-align: left;">Capas ocultas del MLP PD seleccionado</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">Sigmoide</td>
-<td
-style="text-align: left;"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mi>/</mi><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo>+</mo><msup><mi>e</mi><mrow><mi>−</mi><mi>z</mi></mrow></msup><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">1/(1+e^{-z})</annotation></semantics></math></td>
-<td
-style="text-align: left;"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>σ</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mrow><mo stretchy="true" form="prefix">(</mo><mn>1</mn><mo>−</mo><mi>σ</mi><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">\sigma(z)(1-\sigma(z))</annotation></semantics></math></td>
-<td style="text-align: left;">Convertir el logit PD en probabilidad;
-salida acotada cuando corresponde</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">Tanh</td>
-<td
-style="text-align: left;"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>tanh</mo><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">\tanh(z)</annotation></semantics></math></td>
-<td
-style="text-align: left;"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mo>−</mo><msup><mo>tanh</mo><mn>2</mn></msup><mrow><mo stretchy="true" form="prefix">(</mo><mi>z</mi><mo stretchy="true" form="postfix">)</mo></mrow></mrow><annotation encoding="application/x-tex">1-\tanh^2(z)</annotation></semantics></math></td>
-<td style="text-align: left;">Alternativa configurable en las capas
-ocultas, examinada en ablaciones</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">Identidad</td>
-<td
-style="text-align: left;"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>z</mi><annotation encoding="application/x-tex">z</annotation></semantics></math></td>
-<td
-style="text-align: left;"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mn>1</mn><annotation encoding="application/x-tex">1</annotation></semantics></math></td>
-<td style="text-align: left;">Salida <strong>logit</strong> del MLP PD
-antes de <code>BCEWithLogitsLoss</code></td>
-</tr>
-</tbody>
-</table>
-<p><em>Tabla 3.2.2.</em> Funciones de activación y su papel.
-<em>Fuente:</em> elaboración propia; fórmulas y derivadas
-analíticas.</p>
-<h2 id="p2-mlp-relación-con-la-implementación-y-los-experimentos">5. Relación
-con la implementación y los experimentos</h2>
-<p>La arquitectura del MLP se define en <code>src/models/mlp.py</code>;
-el entrenador específico de clasificación está en
-<code>src/models/pd_mlp.py</code>. El archivo
-<code>configs/pd_mlp.yaml</code> registra la configuración seleccionada:
-dos capas ocultas de <strong>64 y 32 neuronas</strong>, activación
-<strong>ReLU</strong>, <code>dropout: 0.0</code>, tasa de aprendizaje
-<strong>0.003</strong>, tamaño de lote <strong>512</strong> y
-regularización configurada como <code>l2: 0.0001</code>. El
-entrenamiento utiliza una salida escalar por observación y la pérdida
-BCE con logits. La comparación experimental entre alternativas de
-arquitectura pertenece al capítulo 5.</p>
-<p>La opción <code>dropout: 0.0</code> significa que <strong>no se
-aplica dropout en esta configuración final</strong>, aunque el núcleo
-admite ese mecanismo en otras configuraciones. La formulación de
-dropout, L1, L2 y parada temprana está desarrollada en la sección 3.5,
-no aquí.</p>
-<table>
-<colgroup>
-<col style="width: 50%" />
-<col style="width: 50%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: left;">Concepto</th>
-<th style="text-align: left;">Evidencia en el repositorio</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">Capas lineales, activaciones y método de
-propagación</td>
-<td style="text-align: left;"><code>src/models/mlp.py</code></td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">Construcción de la arquitectura
-configurable</td>
-<td style="text-align: left;"><code>build_mlp</code> en
-<code>src/models/mlp.py</code></td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">Entrenamiento PD y obtención de
-probabilidades</td>
-<td style="text-align: left;"><code>train_pd_mlp</code>,
-<code>predict_pd</code> en <code>src/models/pd_mlp.py</code></td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">Configuración usada para la selección de
-PD</td>
-<td style="text-align: left;"><code>configs/pd_mlp.yaml</code></td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">Programa de entrenamiento
-reproducible</td>
-<td
-style="text-align: left;"><code>src/experiments/train_pd.py</code></td>
-</tr>
-</tbody>
-</table>
-<p><em>Tabla 3.2.3.</em> Trazabilidad de las definiciones matemáticas al
-código. <em>Fuente:</em> organización del repositorio del proyecto.</p>
-<h2 id="p2-mlp-referencias">6. Referencias</h2>
-<ul>
-<li>Goodfellow, I., Bengio, Y. y Courville, A. (2016). <em>Deep
-Learning</em>. MIT Press, capítulo 6.
-https://www.deeplearningbook.org/</li>
-<li>Nair, V. y Hinton, G. E. (2010). Rectified Linear Units Improve
-Restricted Boltzmann Machines. <em>Proceedings of ICML 2010</em>,
-807–814.</li>
-<li>PyTorch. (s. f.). <em>BCEWithLogitsLoss</em> y módulos de activación
-de <code>torch.nn</code>.
-https://docs.pytorch.org/docs/stable/nn.html</li>
-</ul>
-<p><em>Nota de integración:</em> este apartado desarrolla la
-fundamentación de P2 sin reemplazar las secciones 3.3, 3.4 o 3.5. Las
-referencias cruzadas y la numeración definitiva deberán unificarse al
-ensamblar el informe técnico.</p>
 
-  </div>
+<details class="teoria" id="teoria-neurona-mlp">
+<summary><span>Neurona artificial, MLP y funciones de activación</span></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección formaliza la neurona artificial, la propagación hacia adelante de un perceptrón multicapa (MLP)
+y las funciones de activación disponibles en el núcleo implementado. Se ilustra con la arquitectura PD
+seleccionada a partir de la búsqueda de hiperparámetros.</p>
+</blockquote>
+
+<h3>1. La neurona artificial como función parametrizada</h3>
+<p>Una <strong>neurona artificial</strong> calcula una combinación afín de sus entradas y aplica una función de activación. Para un vector de características $\mathbf{x}=(x_1,\ldots,x_d)^\mathsf{T}\in\mathbb{R}^{d}$:</p>
+<div class="eq">$$z = \sum_{j=1}^{d}w_j x_j + b = \mathbf{w}^\mathsf{T}\mathbf{x} + b, \qquad a = \phi(z).$$</div>
+<p>Aquí $w_j$ es el peso de la característica $x_j$, $b$ es el <strong>sesgo</strong>, $z$ es la entrada neta o <em>preactivación</em>, $\phi$ es la función de activación y $a$ es la salida de la neurona. La transformación afín es diferenciable respecto a sus parámetros:</p>
+<div class="eq">$$\frac{\partial z}{\partial w_j}=x_j, \qquad \frac{\partial z}{\partial b}=1, \qquad \frac{\partial z}{\partial x_j}=w_j.$$</div>
+
+<h3>2. Del perceptrón a un MLP y necesidad de no linealidades</h3>
+<p>Un perceptrón multicapa (<strong>MLP</strong>) conecta varias capas de neuronas. Para la capa $\ell$:</p>
+<div class="eq">$$\mathbf{a}^{(0)}=\mathbf{x},\qquad \mathbf{z}^{(\ell)}=W^{(\ell)}\mathbf{a}^{(\ell-1)}+\mathbf{b}^{(\ell)},\qquad \mathbf{a}^{(\ell)}=\phi_{\ell}\!\left(\mathbf{z}^{(\ell)}\right).$$</div>
+<p>Si la capa anterior tiene $n_{\ell-1}$ unidades y la actual tiene $n_{\ell}$, entonces $W^{(\ell)}\in\mathbb{R}^{n_{\ell}\times n_{\ell-1}}$ y $\mathbf{b}^{(\ell)}\in\mathbb{R}^{n_{\ell}}$.</p>
+
+<p><strong>Por qué son necesarias las no linealidades:</strong> Si todas las capas usaran la activación identidad $\phi(z)=z$, dos capas sucesivas producirían:</p>
+<div class="eq">$$W^{(2)}(W^{(1)}\mathbf{x}+\mathbf{b}^{(1)})+\mathbf{b}^{(2)} = \underbrace{W^{(2)}W^{(1)}}_{\widetilde W}\mathbf{x} + \underbrace{W^{(2)}\mathbf{b}^{(1)}+\mathbf{b}^{(2)}}_{\widetilde{\mathbf b}}.$$</div>
+<p>Es decir, cualquier red profunda exclusivamente afín colapsa en <strong>una sola transformación afín</strong>. Al introducir activaciones no lineales (como ReLU), el MLP puede aproximar fronteras de decisión complejas.</p>
+
+<h3>3. Arquitectura del clasificador PD del proyecto</h3>
+<p>El preprocesamiento entrega <strong>82 características transformadas por observación</strong>. Para la configuración PD seleccionada, la arquitectura es <strong>82–64–32–1</strong>:</p>
+
+<figure>
+<img alt="Arquitectura del MLP PD: 82 entradas, 64 y 32 neuronas ocultas, y 1 logit de salida" src="docs/blog/assets/p2_arquitectura_pd.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Figura 3.2.1. Arquitectura seleccionada para PD:</em> dos capas ocultas con ReLU, un logit en la salida y sigmoide para inferencia de probabilidad.</figcaption>
+</figure>
+
+<p>La propagación hacia adelante queda dada por:</p>
+<div class="eq">$$\begin{aligned}
+\mathbf{h}_1 &= \operatorname{ReLU}(W^{(1)}\mathbf{x}+\mathbf{b}^{(1)}), &&\mathbf{h}_1\in\mathbb{R}^{64},\\
+\mathbf{h}_2 &= \operatorname{ReLU}(W^{(2)}\mathbf{h}_1+\mathbf{b}^{(2)}), &&\mathbf{h}_2\in\mathbb{R}^{32},\\
+z &= W^{(3)}\mathbf{h}_2+b^{(3)}, &&z\in\mathbb{R},\\
+\widehat p &= \sigma(z)=\frac{1}{1+e^{-z}}, &&0<\widehat p<1.
+\end{aligned}$$</div>
+
+<p><strong>Conteo exacto de parámetros entrenables:</strong></p>
+<div class="tabla">
+<table>
+<thead>
+<tr>
+<th>Capa</th>
+<th>Matriz de pesos</th>
+<th>Pesos</th>
+<th>Sesgos</th>
+<th>Total</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Entrada $\to$ oculta 1</td>
+<td>$64\times82$</td>
+<td>5.248</td>
+<td>64</td>
+<td>5.312</td>
+</tr>
+<tr>
+<td>Oculta 1 $\to$ oculta 2</td>
+<td>$32\times64$</td>
+<td>2.048</td>
+<td>32</td>
+<td>2.080</td>
+</tr>
+<tr>
+<td>Oculta 2 $\to$ salida</td>
+<td>$1\times32$</td>
+<td>32</td>
+<td>1</td>
+<td>33</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td>—</td>
+<td><strong>7.328</strong></td>
+<td><strong>97</strong></td>
+<td><strong>7.425</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>4. Funciones de activación utilizadas y derivadas locales</h3>
+<ul>
+    <li><strong>ReLU:</strong> $\operatorname{ReLU}(z)=\max(0,z)$. Su derivada es $1$ para $z>0$ y $0$ para $z<0$ (en $z=0$, PyTorch adopta gradiente 0). Evita la saturación del gradiente en valores positivos.</li>
+    <li><strong>Sigmoide:</strong> $\sigma(z) = \frac{1}{1+e^{-z}}$. Aplicando la regla del cociente:
+    <div class="eq">$$\sigma'(z) = \frac{e^{-z}}{(1+e^{-z})^2} = \sigma(z)\,(1-\sigma(z)).$$</div>
+    Apropiada para modelar probabilidades en $(0, 1)$, pero susceptible a desvanecimiento de gradiente si se usa en capas profundas.</li>
+    <li><strong>Tangente hiperbólica:</strong> $\tanh(z) = \frac{e^z-e^{-z}}{e^z+e^{-z}}$. Su derivada analítica es:
+    <div class="eq">$$\frac{d\tanh(z)}{dz} = 1 - \tanh^2(z).$$</div>
+    Centrada en cero con salida en $(-1, 1)$.</li>
+</ul>
+
+<div class="tabla">
+<table>
+<thead>
+<tr>
+<th>Activación</th>
+<th>Expresión</th>
+<th>Derivada local</th>
+<th>Uso en este trabajo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ReLU</td>
+<td>$\max(0,z)$</td>
+<td>$0$ o $1$</td>
+<td>Capas ocultas del MLP PD seleccionado</td>
+</tr>
+<tr>
+<td>Sigmoide</td>
+<td>$1/(1+e^{-z})$</td>
+<td>$\sigma(z)(1-\sigma(z))$</td>
+<td>Convertir el logit PD en probabilidad; salida de LGD</td>
+</tr>
+<tr>
+<td>Tanh</td>
+<td>$\tanh(z)$</td>
+<td>$1-\tanh^2(z)$</td>
+<td>Alternativa en capas ocultas, examinada en ablaciones</td>
+</tr>
+<tr>
+<td>Identidad</td>
+<td>$z$</td>
+<td>$1$</td>
+<td>Salida logit del MLP PD antes de <code>BCEWithLogitsLoss</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>5. Trazabilidad matemática al código del repositorio</h3>
+<ul>
+    <li><code>src/models/mlp.py</code>: Definición de capas lineales, activaciones y propagación hacia adelante.</li>
+    <li><code>build_mlp</code>: Constructor modular configurable por YAML.</li>
+    <li><code>src/models/pd_mlp.py</code>: Entrenamiento de clasificación y predicción calibrada.</li>
+    <li><code>configs/pd_mlp.yaml</code>: Registro formal de hiperparámetros (lr: 0.003, batch_size: 512, L2: 0.0001).</li>
+</ul>
+</div>
 </details>
-<!-- P2 teoria-neurona-mlp:fin -->
+
+<details class="teoria" id="teoria-retroprop">
+<summary><span>Retropropagación: derivación analítica de gradientes</span></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección deduce cómo aplicar la regla de la cadena para obtener los gradientes analíticos de todos los
+pesos y sesgos del MLP, demostrando la simplificación del error firmado en la salida y validando
+las fórmulas contra autograd en precisión doble.</p>
+</blockquote>
+
+<h3>1. Qué calcula la retropropagación</h3>
+<p>Durante la <strong>retropropagación</strong> (<em>backpropagation</em>) se recorren las capas en sentido inverso para calcular las derivadas de la pérdida $L$ respecto a los parámetros $\theta=\{W^{(\ell)},\mathbf b^{(\ell)}\}_\ell$:</p>
+<div class="eq">$$\nabla_{\theta}L = \left\{\frac{\partial L}{\partial W^{(\ell)}}, \frac{\partial L}{\partial\mathbf b^{(\ell)}}\right\}.$$</div>
+
+<figure>
+<img alt="Esquema de propagación forward y backward en el clasificador PD" src="docs/blog/assets/p2_flujo_retroprop.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Figura 3.4.1. Flujo computacional:</em> el cálculo de activaciones avanza hacia el logit; el gradiente de la pérdida retrocede por la regla de la cadena hacia los parámetros.</figcaption>
+</figure>
+
+<h3>2. Gradiente de salida para la pérdida BCE</h3>
+<p>Para una observación con etiqueta $y \in \{0, 1\}$, logit $z$ y probabilidad $\hat p = \sigma(z)$, la pérdida BCE es:</p>
+<div class="eq">$$\ell(y,\hat p) = -\left[y\ln\hat p + (1-y)\ln(1-\hat p)\right].$$</div>
+
+<p><strong>Paso 1:</strong> Derivada respecto a la probabilidad:<br>
+$\frac{\partial\ell}{\partial\hat p} = -\frac{y}{\hat p} + \frac{1-y}{1-\hat p}$.</p>
+
+<p><strong>Paso 2:</strong> Derivada de la sigmoide respecto al logit:<br>
+$\frac{\partial\hat p}{\partial z} = \hat p(1-\hat p)$.</p>
+
+<p><strong>Paso 3:</strong> Regla de la cadena y simplificación algebraica:<br>
+$$\frac{\partial\ell}{\partial z} = \frac{\partial\ell}{\partial\hat p}\,\frac{\partial\hat p}{\partial z} = \left[-\frac{y}{\hat p}+\frac{1-y}{1-\hat p}\right]\hat p(1-\hat p) = -y(1-\hat p) + (1-y)\hat p = \boxed{\hat p - y}.$$</p>
+
+<blockquote>
+<p><strong>Propiedad central:</strong> El gradiente respecto al logit es exactamente el <strong>error probabilístico firmado</strong> ($\hat p - y$). Si $y=1$ y $\hat p=0{,}4$, el gradiente es $-0{,}6$, empujando el logit al alza. Si $y=0$ y $\hat p=0{,}4$, el gradiente es $+0{,}4$, impulsándolo a la baja. Esta forma coincide directamente con <code>BCEWithLogitsLoss</code> sin riesgo de inestabilidad numérica.</p>
+</blockquote>
+
+<h3>3. Regla de la cadena entre capas ocultas</h3>
+<p>Definiendo el error de preactivación de la capa $\ell$ como $\boldsymbol\delta^{(\ell)} = \frac{\partial\ell}{\partial\mathbf z^{(\ell)}}$, para la salida se tiene $\delta^{(3)} = \hat p - y$. Para las capas ocultas:</p>
+<div class="eq">$$\boldsymbol\delta^{(\ell)} = \left(W^{(\ell+1)\mathsf T}\boldsymbol\delta^{(\ell+1)}\right) \odot \phi'_{\ell}\!\left(\mathbf z^{(\ell)}\right),$$</div>
+<p>donde $\odot$ denota el producto elemento a elemento (Hadamard). Para la red 82–64–32–1:</p>
+<div class="eq">$$\begin{aligned}
+\boldsymbol\delta^{(2)} &= \bigl(W^{(3)\mathsf T}\delta^{(3)}\bigr)\odot \operatorname{ReLU}'(\mathbf z^{(2)}), \\
+\boldsymbol\delta^{(1)} &= \bigl(W^{(2)\mathsf T}\boldsymbol\delta^{(2)}\bigr)\odot \operatorname{ReLU}'(\mathbf z^{(1)}).
+\end{aligned}$$</div>
+
+<h3>4. Gradientes matriciales y reducción por minibatches</h3>
+<p>Aplicando la regla de la cadena respecto a los parámetros:</p>
+<div class="eq">$$\boxed{\frac{\partial\ell}{\partial W^{(\ell)}} = \boldsymbol\delta^{(\ell)}\mathbf a^{(\ell-1)\mathsf T}}, \qquad \boxed{\frac{\partial\ell}{\partial\mathbf b^{(\ell)}} = \boldsymbol\delta^{(\ell)}}.$$</div>
+
+<p>Para un lote (minibatch) de tamaño $N$, el gradiente del costo promedio $J(\theta) = \frac{1}{N}\sum_{i=1}^N \ell_i(\theta)$ es:</p>
+<div class="eq">$$\frac{\partial J}{\partial W^{(\ell)}} = \frac{1}{N}\sum_{i=1}^{N}\boldsymbol\delta_i^{(\ell)}\mathbf a_i^{(\ell-1)\mathsf T}, \qquad \frac{\partial J}{\partial\mathbf b^{(\ell)}} = \frac{1}{N}\sum_{i=1}^{N}\boldsymbol\delta_i^{(\ell)}.$$</div>
+
+<h3>5. Verificación reproducible frente a PyTorch autograd</h3>
+<p>La exactitud de la derivación analítica se verificó mediante una prueba numérica en precisión doble (<code>float64</code>) contrastando las expresiones manuales contra <code>loss.backward()</code>, arrojando diferencias absolutas menores a $10^{-10}$ en todos los tensores:</p>
+<pre><code># Verificación reproducible: analítico vs autograd
+with torch.no_grad():
+    N = X.shape[0]
+    d3 = (torch.sigmoid(z3) - y) / N
+    gW3, gb3 = d3.T @ a2, d3.sum(dim=0)
+    d2 = (d3 @ W3) * (z2 > 0).to(dtype)
+    gW2, gb2 = d2.T @ a1, d2.sum(dim=0)
+    d1 = (d2 @ W2) * (z1 > 0).to(dtype)
+    gW1, gb1 = d1.T @ X, d1.sum(dim=0)
+
+    # Discrepancia máxima verificada < 1e-10 en test_backprop_math.py
+</code></pre>
+</div>
+</details>
 
 <details class="teoria" id="teoria-perdidas">
-<summary><span>Funciones de pérdida por máxima verosimilitud</span><small>Juan David Robayo</small></summary>
+<summary><span>Funciones de pérdida por máxima verosimilitud</span></summary>
 <div class="prosa">
 <blockquote>
 <p>Esta parte tiene dos bloques. El primero deriva cada función de pérdida del proyecto a partir de
@@ -1960,9 +2017,8 @@ referencias y la numeración al ensamblar el blog técnico.</p>
   </div>
 </details>
 <!-- P2 teoria-retropropagacion:fin -->
-
 <details class="teoria" id="teoria-optimizador">
-<summary><span>Optimizador y regularización</span><small>Juan David Robayo</small></summary>
+<summary><span>Optimizador y regularización</span></summary>
 <div class="prosa">
 <blockquote>
 <p>Las funciones de pérdida dicen <strong>qué</strong> se minimiza. Esta parte dice <strong>cómo</strong> se minimiza (SGD y
@@ -2290,6 +2346,178 @@ $C \geq 0{,}003$ da la BCE de validación entre 0,54246 y 0,54263.</p>
 </ul>
 </div>
 </details>
+
+<details class="teoria" id="teoria-metricas">
+<summary><span>Métricas de evaluación y teorema de compresión de varianza</span></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección define las métricas cuantitativas para evaluar discriminación y calibración en PD y LGD,
+e incluye la demostración analítica de por qué un estimador óptimo de la media condicional debe
+comprimir la varianza según la raíz de $R^2$.</p>
+</blockquote>
+
+<h3>1. Métricas de discriminación para PD</h3>
+<p><strong>Área bajo la curva ROC (AUC):</strong> La interpretación probabilística formal (Hanley y McNeil, 1982) es:</p>
+<div class="eq">$$\text{AUC} = P(\hat p_{\text{malo}} > \hat p_{\text{bueno}}) + \tfrac{1}{2}\,P(\hat p_{\text{malo}} = \hat p_{\text{bueno}}).$$</div>
+<p>Se estima mediante el estadístico de Mann–Whitney sobre la suma de rangos $R_1$ de los incumplidos:</p>
+<div class="eq">$$\widehat{\text{AUC}} = \frac{R_1 - n_1(n_1+1)/2}{n_1\, n_0}.$$</div>
+<p>Como solo depende del orden relativo, la AUC es estrictamente invariante ante cualquier transformación monótona creciente (sobre PD, logits o puntajes de scorecard).</p>
+
+<p><strong>Coeficiente de Gini:</strong> $\text{Gini} = 2\,\text{AUC} - 1 \in [-1, 1]$, estándar de la industria bancaria para reportar discriminación.</p>
+
+<p><strong>Estadístico de Kolmogorov–Smirnov (KS):</strong> Máxima separación entre las distribuciones acumuladas empíricas de buenos ($F_0$) y malos ($F_1$):</p>
+<div class="eq">$$\text{KS} = \max_t \lvert F_1(t) - F_0(t) \rvert.$$</div>
+<p>Coincide exactamente con el valor máximo del estadístico $J$ de Youden sobre todos los umbrales de corte.</p>
+
+<h3>2. Métricas de calibración para PD</h3>
+<p><strong>Puntaje de Brier y descomposición de Murphy:</strong> $\text{BS} = \frac{1}{n}\sum_i (\hat p_i - y_i)^2$. La descomposición de Murphy (1973) desacopla sus componentes:</p>
+<div class="eq">$$\text{BS} \approx \underbrace{\tfrac{1}{n}\textstyle\sum_k n_k(\bar p_k - \bar o_k)^2}_{\text{Fiabilidad (descalibración)}} - \underbrace{\tfrac{1}{n}\textstyle\sum_k n_k(\bar o_k - \bar o)^2}_{\text{Resolución (discriminación)}} + \underbrace{\bar o(1-\bar o)}_{\text{Incertidumbre intrínseca}}.$$</div>
+<p>Un modelo mejor calibrado reduce la fiabilidad; uno que discrimina mejor maximiza la resolución.</p>
+
+<h3>3. Métricas de regresión para LGD</h3>
+<div class="eq">$$\text{MAE} = \frac{1}{n}\sum_i \lvert y_i - \hat y_i \rvert, \qquad \text{RMSE} = \sqrt{\frac{1}{n}\sum_i (y_i - \hat y_i)^2}, \qquad R^2 = 1 - \frac{\sum_i (y_i - \hat y_i)^2}{\sum_i (y_i - \bar y)^2}.$$</div>
+
+<p><strong>Calibración continua:</strong> Evaluada con la pendiente de regresión $b = \mathrm{Cov}(y, \hat y)/\mathrm{Var}(\hat y)$. Con calibración ideal $b = 1$; valores $b < 1$ indican sobre-dispersión y $b > 1$, sub-dispersión.</p>
+
+<h3>4. Teorema: Proposición de compresión esperada de la varianza</h3>
+<blockquote>
+<p><strong>Proposición:</strong> Si un modelo estima insesgadamente la media condicional $\hat y = E[Y \mid X]$, entonces:<br>
+(i) $E[\hat y] = E[Y]$; (ii) $\mathrm{Cov}(Y, \hat y) = \mathrm{Var}(\hat y)$, de modo que la pendiente de calibración es $b = 1$;<br>
+y (iii) $R^2 = \mathrm{Var}(\hat y)/\mathrm{Var}(Y)$, lo que implica:</p>
+<div class="eq">$$\frac{\mathrm{sd}(\hat y)}{\mathrm{sd}(Y)} = \sqrt{R^2}.$$</div>
+</blockquote>
+
+<p><strong>Demostración analítica:</strong><br>
+(i) Corresponde a la ley de la esperanza total: $E[\hat y] = E[E[Y \mid X]] = E[Y]$.<br>
+Para (ii), con $\mu = E[Y]$, $\mathrm{Cov}(Y, \hat y) = E\big[E[Y - \mu \mid X]\, (\hat y - \mu)\big] = E[(\hat y - \mu)^2] = \mathrm{Var}(\hat y)$.<br>
+Para (iii), el error cuadrático medio es $E[(Y - \hat y)^2] = E[\mathrm{Var}(Y \mid X)]$. Por la ley de la varianza total:
+$$\mathrm{Var}(Y) = E[\mathrm{Var}(Y \mid X)] + \mathrm{Var}(\hat y) \implies R^2 = 1 - \frac{E[\mathrm{Var}(Y\mid X)]}{\mathrm{Var}(Y)} = \frac{\mathrm{Var}(\hat y)}{\mathrm{Var}(Y)}.$$
+Tomando raíz cuadrada se concluye $\frac{\mathrm{sd}(\hat y)}{\mathrm{sd}(Y)} = \sqrt{R^2}$. $\blacksquare$</p>
+
+<blockquote>
+<p><strong>Consecuencia metodológica crucial:</strong> Un modelo bien calibrado que minimiza el error cuadrático <strong>nunca debe replicar la varianza ni la bimodalidad observada</strong>: si $R^2 \approx 0{,}21$, se espera rigurosamente que $\mathrm{sd}(\hat y) \approx 0{,}46\,\mathrm{sd}(y)$. Evaluar modelos premiando la similitud visual con la distribución observada premiaría modelos descalibrados y sobre-dispersos.</p>
+</blockquote>
+
+<h3>5. Verificación formal con valores teóricos exactos</h3>
+<p>Si $\hat p \sim U(0,1)$ y $y \mid \hat p \sim \text{Bernoulli}(\hat p)$, las densidades teóricas de malos y buenos son $2p$ y $2(1-p)$. Los valores exactos integrados se contrastan en <code>test_valores_teoricos_uniforme_bernoulli</code>:</p>
+<div class="tabla">
+<table>
+<thead>
+<tr>
+<th>Métrica</th>
+<th>Valor teórico</th>
+<th>Derivación analítica</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AUC</td>
+<td>$5/6 \approx 0{,}8333$</td>
+<td>$\int_0^1\int_0^a 2a \cdot 2(1-b)\, db\, da$</td>
+</tr>
+<tr>
+<td>KS</td>
+<td>$1/2 = 0{,}5000$</td>
+<td>$F_1(t) = t^2$, $F_0(t) = 2t - t^2$; diferencia máxima $2t(1-t)$ en $t = 1/2$</td>
+</tr>
+<tr>
+<td>Brier Score</td>
+<td>$1/6 \approx 0{,}1667$</td>
+<td>$E[\hat p(1-\hat p)]$</td>
+</tr>
+<tr>
+<td>BCE</td>
+<td>$1/2 = 0{,}5000$</td>
+<td>$2\int_0^1 -p\ln p\, dp$</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</details>
+
+<details class="teoria" id="teoria-scorecard">
+<summary><span>Derivación matemática de la Scorecard crediticia</span></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección deduce la transformación del modelo de riesgo a una Scorecard comercial estándar por puntos,
+demuestra sus propiedades de invariancia y explica la descomposición aditiva de puntos por variable.</p>
+</blockquote>
+
+<h3>1. Convención de odds de buen pagador</h3>
+<p>Siguiendo la convención bancaria internacional, se definen las <em>odds</em> de buen pagador como $o = (1-p)/p$. Relacionándolas con el logit de la probabilidad de incumplimiento $z = \ln\big(p/(1-p)\big)$, se obtiene la identidad fundamental:</p>
+<div class="eq">$$\ln o = -z.$$</div>
+<p>Un mayor puntaje crediticio refleja menores probabilidades de impago (mayor solvencia).</p>
+
+<h3>2. Derivación analítica formal</h3>
+<p>El puntaje se define como una función lineal del logaritmo de las odds: $S = A + B\ln o = A - B\,z$. Se calibran tres parámetros de negocio:</p>
+<ul>
+    <li>$S_0$: Puntaje base de referencia (ej. 600 puntos).</li>
+    <li>$O_0$: Odds base de buen pagador (ej. 50:1, equivalente a $PD \approx 1{,}96 \%$).</li>
+    <li>$\text{PDO}$: Puntos para duplicar las odds (<em>Points to Double the Odds</em>, ej. 20 puntos).</li>
+</ul>
+
+<p>Planteando el sistema de ecuaciones:</p>
+<div class="eq">$$S_0 = A + B\ln O_0, \qquad S_0 + \text{PDO} = A + B\ln(2\,O_0).$$</div>
+<p>Restando ambas expresiones se despejan unívocamente el factor $B$ y el offset $A$:</p>
+<div class="eq">$$B = \frac{\text{PDO}}{\ln 2}, \qquad A = S_0 - B\ln O_0, \qquad S = A - B\,z.$$</div>
+
+<p>Para $S_0 = 600$, $O_0 = 50$ y $\text{PDO} = 20$, se tiene $B = 28{,}8539$ y $A = 487{,}1229$:</p>
+<div class="tabla">
+<table>
+<thead>
+<tr>
+<th>PD</th>
+<th>Odds de buen pagador</th>
+<th>Puntaje resultante</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$1/101 \approx 0{,}0099$</td>
+<td>100</td>
+<td>620,0</td>
+</tr>
+<tr>
+<td>$1/51 \approx 0{,}0196$</td>
+<td>50</td>
+<td>600,0</td>
+</tr>
+<tr>
+<td>0,2000</td>
+<td>4</td>
+<td>527,1</td>
+</tr>
+<tr>
+<td>0,5000</td>
+<td>1</td>
+<td>487,1</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>3. Propiedades matemáticas e invariancia</h3>
+<ol>
+    <li><strong>Monotonía estricta:</strong> $S$ es decreciente en PD. Menor riesgo siempre otorga más puntos.</li>
+    <li><strong>Duplicación de odds:</strong> Duplicar la solvencia $(1-p)/p$ suma con exactitud $\text{PDO}$ puntos.</li>
+    <li><strong>Invariancia ante cambio de escala:</strong> Cualquier elección de $(S_0', \text{PDO}')$ genera una transformación afín creciente $S' = S_0' + (\text{PDO}'/\text{PDO})(S - S_0)$. En consecuencia, el ranking de clientes, los percentiles poblacionales, el AUC, el Gini y el KS permanecen matemáticamente inalterados.</li>
+</ol>
+
+<h3>4. Descomposición aditiva de puntos por variable</h3>
+<p><strong>En Regresión Logística:</strong> Con $z = \beta_0 + \sum_j \beta_j x_j$, el puntaje se descompone de forma exacta:</p>
+<div class="eq">$$S = \underbrace{(A - B\beta_0)}_{\text{Puntos base}} + \sum_j \underbrace{(-B\, \beta_j\, x_j)}_{\text{Puntos de la variable } j}.$$</div>
+<p>Cada variable aporta $-B\beta_j$ puntos por unidad estandarizada, permitiendo auditar la contribución crediticia individual sin necesidad de agrupar en bines discretos.</p>
+
+<p><strong>En Red Neuronal (MLP):</strong> Para la red no lineal, la descomposición se realiza mediante valores <strong>SHAP</strong> en el espacio del logit ($f(x) = \phi_0 + \sum_j \phi_j(x)$), asignando a cada característica $-B\,\phi_j(x)$ puntos.</p>
+
+<figure>
+<img alt="Scorecard construida sobre el conjunto de test" src="results/figures/p4_scorecard_logreg_test.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Figura 3.7.1. Scorecard crediticia:</em> distribución de puntajes de buenos vs malos pagadores (izquierda) y calibración empírica por deciles de puntaje (derecha).</figcaption>
+</figure>
+</div>
+</details>
+
 <!-- teoria:fin -->
         </section>
         <section class="wrap section" id="detalle">
@@ -2302,7 +2530,7 @@ $C \geq 0{,}003$ da la BCE de validación entre 0,54246 y 0,54263.</p>
             </div>
 <!-- resultados:inicio -->
 <details class="teoria" id="resultados-logistica">
-<summary><span>Regresión logística de referencia para PD</span><small>Juan David Robayo</small></summary>
+<summary><span>Regresión logística de referencia para PD</span></summary>
 <div class="prosa">
 <blockquote>
 <p>Esta sección presenta el modelo de referencia contra el que se compara la red de PD: una
@@ -2775,7 +3003,7 @@ positivo sube el logit de la PD). Intercepto: −0,322. <em>Fuente:</em> elabora
 </div>
 </details>
 <details class="teoria" id="resultados-lgd">
-<summary><span>Red neuronal de LGD</span><small>Juan David Robayo</small></summary>
+<summary><span>Red neuronal de LGD</span></summary>
 <div class="prosa">
 <blockquote>
 <p>Esta sección reporta la construcción y la selección del MLP de LGD. El criterio de selección y cuatro
@@ -3650,6 +3878,18 @@ encontrado al verificar. Se resumen en la Tabla 19.</p>
 <!-- referencias:inicio -->
 <div class="prosa refs">
 <ul>
+<li>Anderson, R. (2007). <em>The Credit Scoring Toolkit: Theory and Practice for Retail Credit Risk Management and Decision Automation</em>. Oxford University Press.</li>
+<li>Brier, G. W. (1950). Verification of forecasts expressed in terms of probability. <em>Monthly Weather Review, 78</em>(1), 1–3. <a href="https://doi.org/10.1175/1520-0493(1950)078<0001:VOFEIT>2.0.CO;2" target="_blank" rel="noopener">https://doi.org/10.1175/1520-0493(1950)078&lt;0001:VOFEIT&gt;2.0.CO;2</a></li>
+<li>Fawcett, T. (2006). An introduction to ROC analysis. <em>Pattern Recognition Letters, 27</em>(8), 861–874. <a href="https://doi.org/10.1016/j.patrec.2005.10.010" target="_blank" rel="noopener">https://doi.org/10.1016/j.patrec.2005.10.010</a></li>
+<li>Goodfellow, I., Bengio, Y., &amp; Courville, A. (2016). <em>Deep Learning</em>. MIT Press. <a href="https://www.deeplearningbook.org/" target="_blank" rel="noopener">https://www.deeplearningbook.org/</a></li>
+<li>Hanley, J. A., &amp; McNeil, B. J. (1982). The meaning and use of the area under a receiver operating characteristic (ROC) curve. <em>Radiology, 143</em>(1), 29–36. <a href="https://doi.org/10.1148/radiology.143.1.7063747" target="_blank" rel="noopener">https://doi.org/10.1148/radiology.143.1.7063747</a></li>
+<li>Lundberg, S. M., &amp; Lee, S.-I. (2017). A unified approach to interpreting model predictions. <em>Advances in Neural Information Processing Systems, 30</em>, 4765–4774.</li>
+<li>Murphy, A. H. (1973). A new vector partition of the probability score. <em>Journal of Applied Meteorology, 12</em>(4), 595–600. <a href="https://doi.org/10.1175/1520-0450(1973)012<0595:ANVPOT>2.0.CO;2" target="_blank" rel="noopener">https://doi.org/10.1175/1520-0450(1973)012&lt;0595:ANVPOT&gt;2.0.CO;2</a></li>
+<li>Nair, V., &amp; Hinton, G. E. (2010). Rectified linear units improve restricted Boltzmann machines. En <em>Proceedings of the 27th International Conference on Machine Learning (ICML 2010)</em> (pp. 807–814).</li>
+<li>Rumelhart, D. E., Hinton, G. E., &amp; Williams, R. J. (1986). Learning representations by back-propagating errors. <em>Nature, 323</em>(6088), 533–536. <a href="https://doi.org/10.1038/323533a0" target="_blank" rel="noopener">https://doi.org/10.1038/323533a0</a></li>
+<li>Saha, R. (2016). <em>Credit Risk Analysis (Lending Club Dataset)</em> [Data set]. Kaggle. <a href="https://www.kaggle.com/datasets/ranadeep/credit-risk-dataset" target="_blank" rel="noopener">https://www.kaggle.com/datasets/ranadeep/credit-risk-dataset</a></li>
+<li>Siddiqi, N. (2006). <em>Credit Risk Scorecards: Developing and Implementing Intelligent Credit Scoring</em>. John Wiley &amp; Sons. <a href="https://doi.org/10.1002/9781119201731" target="_blank" rel="noopener">https://doi.org/10.1002/9781119201731</a></li>
+
 <li>Ferrari, S. L. P., &amp; Cribari-Neto, F. (2004). Beta regression for modelling rates and proportions.
   <em>Journal of Applied Statistics, 31</em>(7), 799–815. <a href="https://doi.org/10.1080/0266476042000214501" target="_blank" rel="noopener">https://doi.org/10.1080/0266476042000214501</a></li>
 <li>Kingma, D. P., &amp; Ba, J. (2015). <em>Adam: A method for stochastic optimization</em> [Conference paper]. 3rd

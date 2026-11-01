@@ -730,8 +730,7 @@
     <header class="topline">
         <div class="wrap nav">
             <div class="brand">[LAB] / RIESGO_CREDITICIO</div>
-            <nav class="navlinks"><a href="#simulador">SIMULADOR</a><a href="#metodo">METODOLOGÍA</a><a
-                    href="#resultados">RESULTADOS</a><a href="#fundamentos">FUNDAMENTOS</a></nav>
+            <nav class="navlinks"><a href="#simulador">SIMULADOR</a><a href="#metodo">METODOLOGÍA</a><a href="#fundamentos">FUNDAMENTOS</a><a href="#detalle">RESULTADOS</a><a href="#ia">AUDITORÍA IA</a><a href="#referencias">BIBLIOGRAFÍA</a></nav>
         </div>
     </header>
     <main>
@@ -880,6 +879,271 @@
                     <p>Revisar discriminación, calibración, variabilidad, complejidad y limitaciones de uso.</p>
                 </div>
             </div>
+            <div style="margin-top: 32px;">
+<!-- metodo:detalles:inicio -->
+<details class="teoria" id="metodo-caso-uso">
+<summary><span>Datos, caso de uso y prevención de fuga de información</span></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección establece el marco operativo y la justificación de auditoría del espacio de variables
+para originación y admisión de crédito, formalizando las exclusiones metodológicas que impiden la
+fuga de información retrospectiva (<em>data leakage</em>) antes del desembolso.</p>
+</blockquote>
+
+<h3>1. Descripción del conjunto de datos</h3>
+<p>El estudio se fundamenta en el conjunto de datos <strong>Credit Risk Analysis (Lending Club)</strong>
+publicado en Kaggle (descarga registrada el 17 de octubre de 2026 en <code>data/raw/fecha_consulta.py</code>):</p>
+<ul>
+    <li><strong>Dimensiones originales:</strong> 887.379 registros y 74 variables.</li>
+    <li><strong>Periodo temporal:</strong> Préstamos originados entre <strong>junio de 2007</strong> y <strong>diciembre de 2015</strong>.</li>
+    <li><strong>Diccionario oficial:</strong> Contrastado con <code>data/raw/LCDataDictionary.xlsx</code>.</li>
+</ul>
+
+<h3>2. Caso de uso del modelo</h3>
+<p>El modelo está diseñado para un <strong>originador de crédito de consumo (banco comercial o FinTech)</strong>
+en la etapa estricta de <strong>admisión y pre-aprobación</strong>:</p>
+<ul>
+    <li><strong>¿Quién usa el modelo?</strong> El motor automatizado de riesgo de crédito y los analistas del comité de admisión.</li>
+    <li><strong>¿Para qué decisión?</strong> Decidir si una solicitud de crédito entrante debe ser <strong>aprobada o rechazada</strong>, y determinar el monto de provisión o reserva preventiva de capital requerida para cubrir la pérdida esperada.</li>
+    <li><strong>¿En qué momento?</strong> En el instante exacto de la solicitud del cliente, <strong>antes de que se realice el desembolso</strong> de los fondos y antes de fijar condiciones contractuales posteriores.</li>
+    <li><strong>¿Con qué información disponible?</strong> Exclusivamente con datos sociodemográficos verificables (ingresos, tipo de vivienda, estabilidad laboral) junto con el historial crediticio consolidado en el buró a la fecha de consulta (indagaciones recientes, morosidades históricas, líneas abiertas, saldo y tasa de utilización rotativa).</li>
+</ul>
+
+<h3>3. Implicaciones metodológicas y prevención de fuga (Data Leakage)</h3>
+<p>La coherencia con el caso de uso de pre-aprobación exige una auditoría rigurosa sobre el espacio de características. Incluir variables que surgen <em>después</em> del desembolso o que son resultado del propio sistema de decisión introduce <strong>fuga de información retrospectiva</strong>, inflando artificialmente las métricas y tornando al modelo inservible en producción.</p>
+
+<p><strong>A. Exclusión del Scoring Propietario de Lending Club:</strong><br>
+Las variables <code>grade</code>, <code>sub_grade</code>, <code>int_rate</code> y <code>installment</code> son asignadas por Lending Club <em>después</em> de que su propio algoritmo interno evaluó al solicitante y fijó la prima de riesgo. Utilizarlas como predictores crearía un sesgo circular: la red neuronal se limitaría a aproximar la regla de asignación de Lending Club en lugar de aprender el riesgo intrínseco del cliente a partir de su historial. Por tanto, se excluyen de la matriz principal de pre-aprobación.</p>
+
+<p><strong>B. Matriz de Auditoría y Exclusión Sistemática de Fuga:</strong></p>
+<div class="tabla">
+<table>
+<thead>
+<tr>
+<th>Categoría de Fuga</th>
+<th>Variables Excluidas</th>
+<th>Justificación Económica y Operativa</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Pagos acumulados posteriores</strong></td>
+<td><code>total_pymnt</code>, <code>total_pymnt_inv</code>, <code>total_rec_prncp</code>, <code>total_rec_int</code>, <code>total_rec_late_fee</code></td>
+<td>Registran pagos realizados a lo largo de la vida del crédito. En la admisión el cliente no ha pagado un solo centavo; su inclusión generaría una fuga perfecta.</td>
+</tr>
+<tr>
+<td><strong>Eventos post-default / cobranza</strong></td>
+<td><code>recoveries</code>, <code>collection_recovery_fee</code></td>
+<td>Ocurren meses después de declarar el crédito como incobrable. Se excluyen en PD; se retienen exclusivamente para formular la variable continua de LGD.</td>
+</tr>
+<tr>
+<td><strong>Saldos dinámicos en curso</strong></td>
+<td><code>out_prncp</code>, <code>out_prncp_inv</code></td>
+<td>Al originar, el saldo pendiente es exactamente el monto desembolsado. Cualquier reducción revela la amortización futura del préstamo.</td>
+</tr>
+<tr>
+<td><strong>Fechas y eventos posteriores</strong></td>
+<td><code>last_pymnt_d</code>, <code>last_pymnt_amnt</code>, <code>last_credit_pull_d</code>, <code>next_pymnt_d</code></td>
+<td>Eventos transaccionales y revisiones de cartera ocurridas durante la vigencia del crédito. No existen al momento de admitir al cliente.</td>
+</tr>
+<tr>
+<td><strong>Identificadores y texto libre</strong></td>
+<td><code>id</code>, <code>member_id</code>, <code>url</code>, <code>desc</code>, <code>title</code>, <code>emp_title</code>, <code>zip_code</code></td>
+<td>Identificadores únicos o categorías de altísima cardinalidad que inducen sobreajuste memorístico y vulneran la privacidad.</td>
+</tr>
+<tr>
+<td><strong>Scoring propio de Lending Club</strong></td>
+<td><code>grade</code>, <code>sub_grade</code>, <code>int_rate</code>, <code>installment</code></td>
+<td>Variables comerciales derivadas del modelo existente de la plataforma; excluidas en pre-aprobación estricta para evaluar riesgo intrínseco.</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>4. Hipótesis explícitas de riesgo de negocio formuladas a priori</h3>
+<ol>
+    <li><strong>Hipótesis 1 (Capacidad de pago y sobreendeudamiento - DTI):</strong> A mayor relación deuda-ingreso (<code>dti</code>), mayor será la probabilidad de incumplimiento ($PD$), debido a la menor holgura financiera del solicitante ante choques de liquidez.</li>
+    <li><strong>Hipótesis 2 (Indagaciones recientes de liquidez):</strong> Un alto número de consultas en el buró de crédito en los últimos 6 meses (<code>inq_last_6mths</code>) se asocia con un mayor riesgo de impago, reflejando búsqueda desesperada de liquidez en múltiples entidades.</li>
+    <li><strong>Hipótesis 3 (Estrés en líneas rotativas):</strong> Niveles elevados de utilización en tarjetas de crédito (<code>revol_util &gt; 80%</code>) incrementan significativamente la probabilidad de default frente a solicitantes con baja utilización.</li>
+    <li><strong>Hipótesis 4 (Estabilidad laboral):</strong> Prestatarios con menor antigüedad en el empleo (<code>emp_length &lt; 1 year</code>) presentan una tasa de default superior frente a solicitantes consolidados con más de 10 años de estabilidad laboral.</li>
+    <li><strong>Hipótesis 5 (Monto financiado y severidad):</strong> Montos de crédito elevados (<code>funded_amnt</code>) no solo incrementan la exposición ($EAD$), sino que exhiben una menor tasa de recuperación post-default (mayor $LGD$).</li>
+</ol>
+</div>
+</details>
+
+<details class="teoria" id="metodo-variables-objetivo">
+<summary><span>Variables objetivo (PD y LGD) y dinámica temporal</span></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección define las variables de salida modeladas (PD como clasificación binaria y LGD como
+regresión acotada en $[0, 1]$), justifica la exclusión de préstamos indeterminados y demuestra
+empíricamente la presencia de sesgo de madurez en las particiones temporales.</p>
+</blockquote>
+
+<h3>1. Probabilidad de Incumplimiento (PD): clasificación binaria</h3>
+<p>La probabilidad de incumplimiento ($PD$) modela la verosimilitud de que un cliente caiga en cesación definitiva de pagos durante el ciclo de vida del crédito. A partir de <code>loan_status</code>, se construyó la etiqueta binaria:</p>
+<div class="eq">$$y_i = \begin{cases} 
+0, & \text{si } \text{loan\_status}_i \in \{\text{'Fully Paid'}, \text{'Does not meet the credit policy. Status:Fully Paid'}\} \\
+1, & \text{si } \text{loan\_status}_i \in \{\text{'Charged Off'}, \text{'Default'}, \text{'Late (31-120 days)'}, \text{'Does not meet the credit policy. Status:Charged Off'}\} \\
+\text{NA}, & \text{si } \text{loan\_status}_i \in \{\text{'Current'}, \text{'Issued'}, \text{'In Grace Period'}, \text{'Late (16-30 days)'}\}
+\end{cases}$$</div>
+
+<p><strong>Exclusión de indeterminados:</strong> Los créditos con desenlace incierto suman <strong>618.849 registros (69,74 % del dataset original)</strong> y se excluyen del entrenamiento y evaluación porque asignarles arbitrariamente 0 o 1 falsearía la probabilidad empírica. Quedan <strong>268.530 créditos resueltos</strong>, con una <strong>tasa global de default del 21,90 %</strong> (209.711 buenos pagadores vs 58.819 incumplidos).</p>
+
+<div class="tabla">
+<table>
+<thead>
+<tr>
+<th>Partición</th>
+<th>Esquema</th>
+<th>Registros Totales</th>
+<th>Tasa de Default ($PD$ Media)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Train</strong></td>
+<td>Temporal (2007–2013)</td>
+<td>163.541</td>
+<td><strong>19,28 %</strong></td>
+</tr>
+<tr>
+<td><strong>Validation</strong></td>
+<td>Temporal (2014)</td>
+<td>74.154</td>
+<td><strong>26,22 %</strong></td>
+</tr>
+<tr>
+<td><strong>Test</strong></td>
+<td>Temporal (2015)</td>
+<td>30.835</td>
+<td><strong>25,46 %</strong></td>
+</tr>
+<tr>
+<td><strong>Train</strong></td>
+<td>Aleatorio (70 %)</td>
+<td>187.971</td>
+<td><strong>21,90 %</strong></td>
+</tr>
+<tr>
+<td><strong>Validation</strong></td>
+<td>Aleatorio (15 %)</td>
+<td>40.279</td>
+<td><strong>21,90 %</strong></td>
+</tr>
+<tr>
+<td><strong>Test</strong></td>
+<td>Aleatorio (15 %)</td>
+<td>40.280</td>
+<td><strong>21,90 %</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>2. Pérdida Dado el Incumplimiento (LGD): regresión acotada</h3>
+<p>Para el universo de créditos que fallaron ($y_i = 1$, con $N = 58.819$ créditos), el banco recupera una parte del capital a través de cobranza extrajudicial o remate de cartera. La severidad o fracción no recuperada corresponde a la $LGD \in [0, 1]$. Se adoptó la <strong>Opción A</strong> (coherente con admisión), donde tanto $LGD$ como la exposición $EAD$ comparten la base contractual del desembolso:</p>
+<div class="eq">$$\text{EAD}_i = \text{funded\_amnt}_i$$</div>
+<div class="eq">$$\text{pérdida}_i = \text{funded\_amnt}_i - \text{total\_rec\_prncp}_i - (\text{recoveries}_i - \text{collection\_recovery\_fee}_i)$$</div>
+<div class="eq">$$\text{LGD}_i = \max\left(0, \min\left(1, \frac{\text{pérdida}_i}{\text{funded\_amnt}_i}\right)\right)$$</div>
+
+<p><strong>Parámetros descriptivos de LGD:</strong></p>
+<ul>
+    <li><strong>Media:</strong> $0{,}7042$ ($70{,}42 \%$).</li>
+    <li><strong>Mediana:</strong> $0{,}7501$ ($75{,}01 \%$).</li>
+    <li><strong>Desviación estándar:</strong> $0{,}2048$.</li>
+    <li><strong>LGD = 0,0 (recuperación total):</strong> $0{,}08 \%$ de las observaciones.</li>
+    <li><strong>LGD = 1,0 (pérdida total sin cobranza):</strong> $0{,}61 \%$ de las observaciones.</li>
+</ul>
+
+<figure>
+<img alt="Distribución empírica de LGD" src="results/figures/distribucion_lgd.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Distribución empírica de LGD:</em> marcada bimodalidad con concentración entre 0,6 y 0,9.</figcaption>
+</figure>
+
+<h3>3. Dinámica temporal y sesgo de madurez (Maturity Bias)</h3>
+<p>La tasa observada de mora varía notablemente según el año de originación:</p>
+<figure>
+<img alt="Tasa de default por año" src="results/figures/tasa_default_por_anio.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Tasa de incumplimiento observada según año de originación.</em></figcaption>
+</figure>
+
+<p>Al analizar el dataset crudo frente a los créditos resueltos, se evidencia la presencia masiva de créditos no madurados:</p>
+<figure>
+<img alt="Sesgo de madurez en Lending Club" src="results/figures/sesgo_madurez.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Composición de cartera resuelta vs vigente por año de originación.</em></figcaption>
+</figure>
+
+<ul>
+    <li>En <strong>2011</strong>, más del $90 \%$ de los créditos completaron su ciclo.</li>
+    <li>En <strong>2014</strong>, el $67{,}29 \%$ de los préstamos seguían vigentes (<code>Current</code>).</li>
+    <li>En <strong>2015</strong>, el <strong>$89{,}66 \%$</strong> ($377.553$ créditos) se encontraban vigentes al momento de extracción.</li>
+</ul>
+
+<blockquote>
+<p><strong>Impacto clave para la sustentación:</strong> Los únicos créditos resueltos observables de la cohorte 2015 son aquellos que entraron en default acelerado en sus primeros meses de vida. Los buenos pagadores a 36 y 60 meses aún no habían concluido sus amortizaciones. Este fenómeno de <strong>censura por derecha</strong> explica por qué la partición temporal de Test 2015 presenta una tasa de default aparentemente más alta ($25{,}46 \%$) y una LGD empírica severamente más elevada ($90{,}5 \%$, visible en la Figura de LGD anual), aspecto clave del análisis temporal.</p>
+</blockquote>
+
+<figure>
+<img alt="LGD media por año de originación" src="results/figures/lgd_media_por_anio.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Evolución de la LGD media según año de originación: ascenso abrupto en 2014-2015 por censura de cobranza.</em></figcaption>
+</figure>
+
+<figure>
+<img alt="EAD medio por año de originación" src="results/figures/ead_medio_por_anio.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Exposición media al momento del incumplimiento (EAD) por año.</em></figcaption>
+</figure>
+</div>
+</details>
+
+<details class="teoria" id="metodo-perdida-esperada">
+<summary><span>Pérdida esperada (Expected Loss) y marco regulatorio</span></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección formula el cálculo integral de Pérdida Esperada ($E[L]$) bajo estándares de Basilea II y III,
+evaluando la cartera de prueba temporal de 2015 con estimadores base y comparándolos con las
+predicciones individualizadas de las redes neuronales.</p>
+</blockquote>
+
+<h3>1. Fundamentación teórica y marco regulatorio de Basilea</h3>
+<p>Bajo las directrices del Comité de Supervisión Bancaria de Basilea, el riesgo crediticio se cuantifica combinando tres dimensiones complementarias:</p>
+<ol>
+    <li><strong>Probabilidad de Incumplimiento ($PD$):</strong> Verosimilitud de impago del acreditado.</li>
+    <li><strong>Severidad o Pérdida Dado el Incumplimiento ($LGD$):</strong> Fracción no recuperada del crédito.</li>
+    <li><strong>Exposición al Incumplimiento ($EAD$):</strong> Monto en riesgo al momento del impago.</li>
+</ol>
+
+<p>La <strong>Pérdida Esperada ($E[L]$)</strong> representa el costo operativo ordinario del negocio y define las provisiones contables que la entidad debe constituir:</p>
+<div class="eq">$$E[L]_i = PD_i \times LGD_i \times EAD_i$$</div>
+<div class="eq">$$E[L]_{\text{cartera}} = \sum_{i=1}^N PD_i \times LGD_i \times EAD_i, \qquad \text{Tasa } E[L] = \frac{E[L]_{\text{cartera}}}{\sum_{i=1}^N EAD_i}$$</div>
+
+<h3>2. Resultados del baseline estadístico naive (Prueba Temporal 2015)</h3>
+<p>Como cota de referencia previa a las redes neuronales, se evaluó la cartera de prueba temporal ($N = 30.835$ créditos resueltos de 2015) con estimadores <em>naive</em> basados en medias históricas:</p>
+<ul>
+    <li><strong>Exposición total de la cartera ($EAD$):</strong> <strong>$452.036.160{,}00\text{ USD}$</strong></li>
+    <li><strong>Pérdida esperada agregada ($E[L]_{\text{total}}$):</strong> <strong>$70.749.712{,}00\text{ USD}$</strong></li>
+    <li><strong>Tasa de pérdida esperada de cartera:</strong> <strong>$15{,}65 \%$</strong></li>
+    <li><strong>Pérdida esperada promedio por crédito:</strong> $2.294{,}46\text{ USD}$ (mediana: $1.960{,}33\text{ USD}$)</li>
+</ul>
+
+<h3>3. Distribución empírica de la pérdida esperada</h3>
+<figure>
+<img alt="Distribución empírica de la Pérdida Esperada individual" src="results/figures/distribucion_el.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Distribución individual de E[L]:</em> marcada asimetría hacia la derecha (la mayoría de créditos presentan pérdidas esperadas inferiores a $3.000 USD, con una cola de alta exposición).</figcaption>
+</figure>
+
+<figure>
+<img alt="Pérdida esperada por rango de PD" src="results/figures/el_por_rango_pd.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Pérdida esperada agregada por decil de PD:</em> relación monótona creciente esperada entre riesgo y provisión requerida.</figcaption>
+</figure>
+
+<h3>4. Interpretación de negocio y ventaja del scoring individualizado</h3>
+<p>La entidad originadora debe constituir una reserva mínima de <strong>$70{,}75\text{ millones de USD}$</strong> para respaldar la cartera colocada en 2015 bajo medias históricas. Cuando se sustituyen las tasas promedio por las predicciones de las redes neuronales desarrolladas, la institución discrimina con alta precisión qué solicitantes concentran el riesgo monetario, permitiendo racionalizar el capital, optimizar la admisión y ajustar las tasas de interés ofrecidas.</p>
+</div>
+</details>
+<!-- metodo:detalles:fin -->
+            </div>
+
         </section>
         <section class="wrap section" id="fundamentos">
             <div class="section-head">
@@ -890,8 +1154,222 @@
                 <p>Derivaciones completas del reporte técnico. Despliega un tema para leerlo.</p>
             </div>
 <!-- teoria:inicio -->
+
+<details class="teoria" id="teoria-neurona-mlp">
+<summary><span>Neurona artificial, MLP y funciones de activación</span></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección formaliza la neurona artificial, la propagación hacia adelante de un perceptrón multicapa (MLP)
+y las funciones de activación disponibles en el núcleo implementado. Se ilustra con la arquitectura PD
+seleccionada a partir de la búsqueda de hiperparámetros.</p>
+</blockquote>
+
+<h3>1. La neurona artificial como función parametrizada</h3>
+<p>Una <strong>neurona artificial</strong> calcula una combinación afín de sus entradas y aplica una función de activación. Para un vector de características $\mathbf{x}=(x_1,\ldots,x_d)^\mathsf{T}\in\mathbb{R}^{d}$:</p>
+<div class="eq">$$z = \sum_{j=1}^{d}w_j x_j + b = \mathbf{w}^\mathsf{T}\mathbf{x} + b, \qquad a = \phi(z).$$</div>
+<p>Aquí $w_j$ es el peso de la característica $x_j$, $b$ es el <strong>sesgo</strong>, $z$ es la entrada neta o <em>preactivación</em>, $\phi$ es la función de activación y $a$ es la salida de la neurona. La transformación afín es diferenciable respecto a sus parámetros:</p>
+<div class="eq">$$\frac{\partial z}{\partial w_j}=x_j, \qquad \frac{\partial z}{\partial b}=1, \qquad \frac{\partial z}{\partial x_j}=w_j.$$</div>
+
+<h3>2. Del perceptrón a un MLP y necesidad de no linealidades</h3>
+<p>Un perceptrón multicapa (<strong>MLP</strong>) conecta varias capas de neuronas. Para la capa $\ell$:</p>
+<div class="eq">$$\mathbf{a}^{(0)}=\mathbf{x},\qquad \mathbf{z}^{(\ell)}=W^{(\ell)}\mathbf{a}^{(\ell-1)}+\mathbf{b}^{(\ell)},\qquad \mathbf{a}^{(\ell)}=\phi_{\ell}\!\left(\mathbf{z}^{(\ell)}\right).$$</div>
+<p>Si la capa anterior tiene $n_{\ell-1}$ unidades y la actual tiene $n_{\ell}$, entonces $W^{(\ell)}\in\mathbb{R}^{n_{\ell}\times n_{\ell-1}}$ y $\mathbf{b}^{(\ell)}\in\mathbb{R}^{n_{\ell}}$.</p>
+
+<p><strong>Por qué son necesarias las no linealidades:</strong> Si todas las capas usaran la activación identidad $\phi(z)=z$, dos capas sucesivas producirían:</p>
+<div class="eq">$$W^{(2)}(W^{(1)}\mathbf{x}+\mathbf{b}^{(1)})+\mathbf{b}^{(2)} = \underbrace{W^{(2)}W^{(1)}}_{\widetilde W}\mathbf{x} + \underbrace{W^{(2)}\mathbf{b}^{(1)}+\mathbf{b}^{(2)}}_{\widetilde{\mathbf b}}.$$</div>
+<p>Es decir, cualquier red profunda exclusivamente afín colapsa en <strong>una sola transformación afín</strong>. Al introducir activaciones no lineales (como ReLU), el MLP puede aproximar fronteras de decisión complejas.</p>
+
+<h3>3. Arquitectura del clasificador PD del proyecto</h3>
+<p>El preprocesamiento entrega <strong>82 características transformadas por observación</strong>. Para la configuración PD seleccionada, la arquitectura es <strong>82–64–32–1</strong>:</p>
+
+<figure>
+<img alt="Arquitectura del MLP PD: 82 entradas, 64 y 32 neuronas ocultas, y 1 logit de salida" src="docs/blog/assets/p2_arquitectura_pd.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Figura 3.2.1. Arquitectura seleccionada para PD:</em> dos capas ocultas con ReLU, un logit en la salida y sigmoide para inferencia de probabilidad.</figcaption>
+</figure>
+
+<p>La propagación hacia adelante queda dada por:</p>
+<div class="eq">$$\begin{aligned}
+\mathbf{h}_1 &= \operatorname{ReLU}(W^{(1)}\mathbf{x}+\mathbf{b}^{(1)}), &&\mathbf{h}_1\in\mathbb{R}^{64},\\
+\mathbf{h}_2 &= \operatorname{ReLU}(W^{(2)}\mathbf{h}_1+\mathbf{b}^{(2)}), &&\mathbf{h}_2\in\mathbb{R}^{32},\\
+z &= W^{(3)}\mathbf{h}_2+b^{(3)}, &&z\in\mathbb{R},\\
+\widehat p &= \sigma(z)=\frac{1}{1+e^{-z}}, &&0<\widehat p<1.
+\end{aligned}$$</div>
+
+<p><strong>Conteo exacto de parámetros entrenables:</strong></p>
+<div class="tabla">
+<table>
+<thead>
+<tr>
+<th>Capa</th>
+<th>Matriz de pesos</th>
+<th>Pesos</th>
+<th>Sesgos</th>
+<th>Total</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Entrada $\to$ oculta 1</td>
+<td>$64\times82$</td>
+<td>5.248</td>
+<td>64</td>
+<td>5.312</td>
+</tr>
+<tr>
+<td>Oculta 1 $\to$ oculta 2</td>
+<td>$32\times64$</td>
+<td>2.048</td>
+<td>32</td>
+<td>2.080</td>
+</tr>
+<tr>
+<td>Oculta 2 $\to$ salida</td>
+<td>$1\times32$</td>
+<td>32</td>
+<td>1</td>
+<td>33</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td>—</td>
+<td><strong>7.328</strong></td>
+<td><strong>97</strong></td>
+<td><strong>7.425</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>4. Funciones de activación utilizadas y derivadas locales</h3>
+<ul>
+    <li><strong>ReLU:</strong> $\operatorname{ReLU}(z)=\max(0,z)$. Su derivada es $1$ para $z>0$ y $0$ para $z<0$ (en $z=0$, PyTorch adopta gradiente 0). Evita la saturación del gradiente en valores positivos.</li>
+    <li><strong>Sigmoide:</strong> $\sigma(z) = \frac{1}{1+e^{-z}}$. Aplicando la regla del cociente:
+    <div class="eq">$$\sigma'(z) = \frac{e^{-z}}{(1+e^{-z})^2} = \sigma(z)\,(1-\sigma(z)).$$</div>
+    Apropiada para modelar probabilidades en $(0, 1)$, pero susceptible a desvanecimiento de gradiente si se usa en capas profundas.</li>
+    <li><strong>Tangente hiperbólica:</strong> $\tanh(z) = \frac{e^z-e^{-z}}{e^z+e^{-z}}$. Su derivada analítica es:
+    <div class="eq">$$\frac{d\tanh(z)}{dz} = 1 - \tanh^2(z).$$</div>
+    Centrada en cero con salida en $(-1, 1)$.</li>
+</ul>
+
+<div class="tabla">
+<table>
+<thead>
+<tr>
+<th>Activación</th>
+<th>Expresión</th>
+<th>Derivada local</th>
+<th>Uso en este trabajo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ReLU</td>
+<td>$\max(0,z)$</td>
+<td>$0$ o $1$</td>
+<td>Capas ocultas del MLP PD seleccionado</td>
+</tr>
+<tr>
+<td>Sigmoide</td>
+<td>$1/(1+e^{-z})$</td>
+<td>$\sigma(z)(1-\sigma(z))$</td>
+<td>Convertir el logit PD en probabilidad; salida de LGD</td>
+</tr>
+<tr>
+<td>Tanh</td>
+<td>$\tanh(z)$</td>
+<td>$1-\tanh^2(z)$</td>
+<td>Alternativa en capas ocultas, examinada en ablaciones</td>
+</tr>
+<tr>
+<td>Identidad</td>
+<td>$z$</td>
+<td>$1$</td>
+<td>Salida logit del MLP PD antes de <code>BCEWithLogitsLoss</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>5. Trazabilidad matemática al código del repositorio</h3>
+<ul>
+    <li><code>src/models/mlp.py</code>: Definición de capas lineales, activaciones y propagación hacia adelante.</li>
+    <li><code>build_mlp</code>: Constructor modular configurable por YAML.</li>
+    <li><code>src/models/pd_mlp.py</code>: Entrenamiento de clasificación y predicción calibrada.</li>
+    <li><code>configs/pd_mlp.yaml</code>: Registro formal de hiperparámetros (lr: 0.003, batch_size: 512, L2: 0.0001).</li>
+</ul>
+</div>
+</details>
+
+<details class="teoria" id="teoria-retroprop">
+<summary><span>Retropropagación: derivación analítica de gradientes</span></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección deduce cómo aplicar la regla de la cadena para obtener los gradientes analíticos de todos los
+pesos y sesgos del MLP, demostrando la simplificación del error firmado en la salida y validando
+las fórmulas contra autograd en precisión doble.</p>
+</blockquote>
+
+<h3>1. Qué calcula la retropropagación</h3>
+<p>Durante la <strong>retropropagación</strong> (<em>backpropagation</em>) se recorren las capas en sentido inverso para calcular las derivadas de la pérdida $L$ respecto a los parámetros $\theta=\{W^{(\ell)},\mathbf b^{(\ell)}\}_\ell$:</p>
+<div class="eq">$$\nabla_{\theta}L = \left\{\frac{\partial L}{\partial W^{(\ell)}}, \frac{\partial L}{\partial\mathbf b^{(\ell)}}\right\}.$$</div>
+
+<figure>
+<img alt="Esquema de propagación forward y backward en el clasificador PD" src="docs/blog/assets/p2_flujo_retroprop.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Figura 3.4.1. Flujo computacional:</em> el cálculo de activaciones avanza hacia el logit; el gradiente de la pérdida retrocede por la regla de la cadena hacia los parámetros.</figcaption>
+</figure>
+
+<h3>2. Gradiente de salida para la pérdida BCE</h3>
+<p>Para una observación con etiqueta $y \in \{0, 1\}$, logit $z$ y probabilidad $\hat p = \sigma(z)$, la pérdida BCE es:</p>
+<div class="eq">$$\ell(y,\hat p) = -\left[y\ln\hat p + (1-y)\ln(1-\hat p)\right].$$</div>
+
+<p><strong>Paso 1:</strong> Derivada respecto a la probabilidad:<br>
+$\frac{\partial\ell}{\partial\hat p} = -\frac{y}{\hat p} + \frac{1-y}{1-\hat p}$.</p>
+
+<p><strong>Paso 2:</strong> Derivada de la sigmoide respecto al logit:<br>
+$\frac{\partial\hat p}{\partial z} = \hat p(1-\hat p)$.</p>
+
+<p><strong>Paso 3:</strong> Regla de la cadena y simplificación algebraica:<br>
+$$\frac{\partial\ell}{\partial z} = \frac{\partial\ell}{\partial\hat p}\,\frac{\partial\hat p}{\partial z} = \left[-\frac{y}{\hat p}+\frac{1-y}{1-\hat p}\right]\hat p(1-\hat p) = -y(1-\hat p) + (1-y)\hat p = \boxed{\hat p - y}.$$</p>
+
+<blockquote>
+<p><strong>Propiedad central:</strong> El gradiente respecto al logit es exactamente el <strong>error probabilístico firmado</strong> ($\hat p - y$). Si $y=1$ y $\hat p=0{,}4$, el gradiente es $-0{,}6$, empujando el logit al alza. Si $y=0$ y $\hat p=0{,}4$, el gradiente es $+0{,}4$, impulsándolo a la baja. Esta forma coincide directamente con <code>BCEWithLogitsLoss</code> sin riesgo de inestabilidad numérica.</p>
+</blockquote>
+
+<h3>3. Regla de la cadena entre capas ocultas</h3>
+<p>Definiendo el error de preactivación de la capa $\ell$ como $\boldsymbol\delta^{(\ell)} = \frac{\partial\ell}{\partial\mathbf z^{(\ell)}}$, para la salida se tiene $\delta^{(3)} = \hat p - y$. Para las capas ocultas:</p>
+<div class="eq">$$\boldsymbol\delta^{(\ell)} = \left(W^{(\ell+1)\mathsf T}\boldsymbol\delta^{(\ell+1)}\right) \odot \phi'_{\ell}\!\left(\mathbf z^{(\ell)}\right),$$</div>
+<p>donde $\odot$ denota el producto elemento a elemento (Hadamard). Para la red 82–64–32–1:</p>
+<div class="eq">$$\begin{aligned}
+\boldsymbol\delta^{(2)} &= \bigl(W^{(3)\mathsf T}\delta^{(3)}\bigr)\odot \operatorname{ReLU}'(\mathbf z^{(2)}), \\
+\boldsymbol\delta^{(1)} &= \bigl(W^{(2)\mathsf T}\boldsymbol\delta^{(2)}\bigr)\odot \operatorname{ReLU}'(\mathbf z^{(1)}).
+\end{aligned}$$</div>
+
+<h3>4. Gradientes matriciales y reducción por minibatches</h3>
+<p>Aplicando la regla de la cadena respecto a los parámetros:</p>
+<div class="eq">$$\boxed{\frac{\partial\ell}{\partial W^{(\ell)}} = \boldsymbol\delta^{(\ell)}\mathbf a^{(\ell-1)\mathsf T}}, \qquad \boxed{\frac{\partial\ell}{\partial\mathbf b^{(\ell)}} = \boldsymbol\delta^{(\ell)}}.$$</div>
+
+<p>Para un lote (minibatch) de tamaño $N$, el gradiente del costo promedio $J(\theta) = \frac{1}{N}\sum_{i=1}^N \ell_i(\theta)$ es:</p>
+<div class="eq">$$\frac{\partial J}{\partial W^{(\ell)}} = \frac{1}{N}\sum_{i=1}^{N}\boldsymbol\delta_i^{(\ell)}\mathbf a_i^{(\ell-1)\mathsf T}, \qquad \frac{\partial J}{\partial\mathbf b^{(\ell)}} = \frac{1}{N}\sum_{i=1}^{N}\boldsymbol\delta_i^{(\ell)}.$$</div>
+
+<h3>5. Verificación reproducible frente a PyTorch autograd</h3>
+<p>La exactitud de la derivación analítica se verificó mediante una prueba numérica en precisión doble (<code>float64</code>) contrastando las expresiones manuales contra <code>loss.backward()</code>, arrojando diferencias absolutas menores a $10^{-10}$ en todos los tensores:</p>
+<pre><code># Verificación reproducible: analítico vs autograd
+with torch.no_grad():
+    N = X.shape[0]
+    d3 = (torch.sigmoid(z3) - y) / N
+    gW3, gb3 = d3.T @ a2, d3.sum(dim=0)
+    d2 = (d3 @ W3) * (z2 > 0).to(dtype)
+    gW2, gb2 = d2.T @ a1, d2.sum(dim=0)
+    d1 = (d2 @ W2) * (z1 > 0).to(dtype)
+    gW1, gb1 = d1.T @ X, d1.sum(dim=0)
+
+    # Discrepancia máxima verificada < 1e-10 en test_backprop_math.py
+</code></pre>
+</div>
+</details>
+
 <details class="teoria" id="teoria-perdidas">
-<summary><span>Funciones de pérdida por máxima verosimilitud</span><small>Juan David Robayo</small></summary>
+<summary><span>Funciones de pérdida por máxima verosimilitud</span></summary>
 <div class="prosa">
 <blockquote>
 <p>Esta parte tiene dos bloques. El primero deriva cada función de pérdida del proyecto a partir de
@@ -1160,7 +1638,7 @@ a la observada). En los resultados de la red de LGD se comparan además el estad
 </div>
 </details>
 <details class="teoria" id="teoria-optimizador">
-<summary><span>Optimizador y regularización</span><small>Juan David Robayo</small></summary>
+<summary><span>Optimizador y regularización</span></summary>
 <div class="prosa">
 <blockquote>
 <p>Las funciones de pérdida dicen <strong>qué</strong> se minimiza. Esta parte dice <strong>cómo</strong> se minimiza (SGD y
@@ -1488,6 +1966,178 @@ $C \geq 0{,}003$ da la BCE de validación entre 0,54246 y 0,54263.</p>
 </ul>
 </div>
 </details>
+
+<details class="teoria" id="teoria-metricas">
+<summary><span>Métricas de evaluación y teorema de compresión de varianza</span></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección define las métricas cuantitativas para evaluar discriminación y calibración en PD y LGD,
+e incluye la demostración analítica de por qué un estimador óptimo de la media condicional debe
+comprimir la varianza según la raíz de $R^2$.</p>
+</blockquote>
+
+<h3>1. Métricas de discriminación para PD</h3>
+<p><strong>Área bajo la curva ROC (AUC):</strong> La interpretación probabilística formal (Hanley y McNeil, 1982) es:</p>
+<div class="eq">$$\text{AUC} = P(\hat p_{\text{malo}} > \hat p_{\text{bueno}}) + \tfrac{1}{2}\,P(\hat p_{\text{malo}} = \hat p_{\text{bueno}}).$$</div>
+<p>Se estima mediante el estadístico de Mann–Whitney sobre la suma de rangos $R_1$ de los incumplidos:</p>
+<div class="eq">$$\widehat{\text{AUC}} = \frac{R_1 - n_1(n_1+1)/2}{n_1\, n_0}.$$</div>
+<p>Como solo depende del orden relativo, la AUC es estrictamente invariante ante cualquier transformación monótona creciente (sobre PD, logits o puntajes de scorecard).</p>
+
+<p><strong>Coeficiente de Gini:</strong> $\text{Gini} = 2\,\text{AUC} - 1 \in [-1, 1]$, estándar de la industria bancaria para reportar discriminación.</p>
+
+<p><strong>Estadístico de Kolmogorov–Smirnov (KS):</strong> Máxima separación entre las distribuciones acumuladas empíricas de buenos ($F_0$) y malos ($F_1$):</p>
+<div class="eq">$$\text{KS} = \max_t \lvert F_1(t) - F_0(t) \rvert.$$</div>
+<p>Coincide exactamente con el valor máximo del estadístico $J$ de Youden sobre todos los umbrales de corte.</p>
+
+<h3>2. Métricas de calibración para PD</h3>
+<p><strong>Puntaje de Brier y descomposición de Murphy:</strong> $\text{BS} = \frac{1}{n}\sum_i (\hat p_i - y_i)^2$. La descomposición de Murphy (1973) desacopla sus componentes:</p>
+<div class="eq">$$\text{BS} \approx \underbrace{\tfrac{1}{n}\textstyle\sum_k n_k(\bar p_k - \bar o_k)^2}_{\text{Fiabilidad (descalibración)}} - \underbrace{\tfrac{1}{n}\textstyle\sum_k n_k(\bar o_k - \bar o)^2}_{\text{Resolución (discriminación)}} + \underbrace{\bar o(1-\bar o)}_{\text{Incertidumbre intrínseca}}.$$</div>
+<p>Un modelo mejor calibrado reduce la fiabilidad; uno que discrimina mejor maximiza la resolución.</p>
+
+<h3>3. Métricas de regresión para LGD</h3>
+<div class="eq">$$\text{MAE} = \frac{1}{n}\sum_i \lvert y_i - \hat y_i \rvert, \qquad \text{RMSE} = \sqrt{\frac{1}{n}\sum_i (y_i - \hat y_i)^2}, \qquad R^2 = 1 - \frac{\sum_i (y_i - \hat y_i)^2}{\sum_i (y_i - \bar y)^2}.$$</div>
+
+<p><strong>Calibración continua:</strong> Evaluada con la pendiente de regresión $b = \mathrm{Cov}(y, \hat y)/\mathrm{Var}(\hat y)$. Con calibración ideal $b = 1$; valores $b < 1$ indican sobre-dispersión y $b > 1$, sub-dispersión.</p>
+
+<h3>4. Teorema: Proposición de compresión esperada de la varianza</h3>
+<blockquote>
+<p><strong>Proposición:</strong> Si un modelo estima insesgadamente la media condicional $\hat y = E[Y \mid X]$, entonces:<br>
+(i) $E[\hat y] = E[Y]$; (ii) $\mathrm{Cov}(Y, \hat y) = \mathrm{Var}(\hat y)$, de modo que la pendiente de calibración es $b = 1$;<br>
+y (iii) $R^2 = \mathrm{Var}(\hat y)/\mathrm{Var}(Y)$, lo que implica:</p>
+<div class="eq">$$\frac{\mathrm{sd}(\hat y)}{\mathrm{sd}(Y)} = \sqrt{R^2}.$$</div>
+</blockquote>
+
+<p><strong>Demostración analítica:</strong><br>
+(i) Corresponde a la ley de la esperanza total: $E[\hat y] = E[E[Y \mid X]] = E[Y]$.<br>
+Para (ii), con $\mu = E[Y]$, $\mathrm{Cov}(Y, \hat y) = E\big[E[Y - \mu \mid X]\, (\hat y - \mu)\big] = E[(\hat y - \mu)^2] = \mathrm{Var}(\hat y)$.<br>
+Para (iii), el error cuadrático medio es $E[(Y - \hat y)^2] = E[\mathrm{Var}(Y \mid X)]$. Por la ley de la varianza total:
+$$\mathrm{Var}(Y) = E[\mathrm{Var}(Y \mid X)] + \mathrm{Var}(\hat y) \implies R^2 = 1 - \frac{E[\mathrm{Var}(Y\mid X)]}{\mathrm{Var}(Y)} = \frac{\mathrm{Var}(\hat y)}{\mathrm{Var}(Y)}.$$
+Tomando raíz cuadrada se concluye $\frac{\mathrm{sd}(\hat y)}{\mathrm{sd}(Y)} = \sqrt{R^2}$. $\blacksquare$</p>
+
+<blockquote>
+<p><strong>Consecuencia metodológica crucial:</strong> Un modelo bien calibrado que minimiza el error cuadrático <strong>nunca debe replicar la varianza ni la bimodalidad observada</strong>: si $R^2 \approx 0{,}21$, se espera rigurosamente que $\mathrm{sd}(\hat y) \approx 0{,}46\,\mathrm{sd}(y)$. Evaluar modelos premiando la similitud visual con la distribución observada premiaría modelos descalibrados y sobre-dispersos.</p>
+</blockquote>
+
+<h3>5. Verificación formal con valores teóricos exactos</h3>
+<p>Si $\hat p \sim U(0,1)$ y $y \mid \hat p \sim \text{Bernoulli}(\hat p)$, las densidades teóricas de malos y buenos son $2p$ y $2(1-p)$. Los valores exactos integrados se contrastan en <code>test_valores_teoricos_uniforme_bernoulli</code>:</p>
+<div class="tabla">
+<table>
+<thead>
+<tr>
+<th>Métrica</th>
+<th>Valor teórico</th>
+<th>Derivación analítica</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AUC</td>
+<td>$5/6 \approx 0{,}8333$</td>
+<td>$\int_0^1\int_0^a 2a \cdot 2(1-b)\, db\, da$</td>
+</tr>
+<tr>
+<td>KS</td>
+<td>$1/2 = 0{,}5000$</td>
+<td>$F_1(t) = t^2$, $F_0(t) = 2t - t^2$; diferencia máxima $2t(1-t)$ en $t = 1/2$</td>
+</tr>
+<tr>
+<td>Brier Score</td>
+<td>$1/6 \approx 0{,}1667$</td>
+<td>$E[\hat p(1-\hat p)]$</td>
+</tr>
+<tr>
+<td>BCE</td>
+<td>$1/2 = 0{,}5000$</td>
+<td>$2\int_0^1 -p\ln p\, dp$</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</details>
+
+<details class="teoria" id="teoria-scorecard">
+<summary><span>Derivación matemática de la Scorecard crediticia</span></summary>
+<div class="prosa">
+<blockquote>
+<p>Esta sección deduce la transformación del modelo de riesgo a una Scorecard comercial estándar por puntos,
+demuestra sus propiedades de invariancia y explica la descomposición aditiva de puntos por variable.</p>
+</blockquote>
+
+<h3>1. Convención de odds de buen pagador</h3>
+<p>Siguiendo la convención bancaria internacional, se definen las <em>odds</em> de buen pagador como $o = (1-p)/p$. Relacionándolas con el logit de la probabilidad de incumplimiento $z = \ln\big(p/(1-p)\big)$, se obtiene la identidad fundamental:</p>
+<div class="eq">$$\ln o = -z.$$</div>
+<p>Un mayor puntaje crediticio refleja menores probabilidades de impago (mayor solvencia).</p>
+
+<h3>2. Derivación analítica formal</h3>
+<p>El puntaje se define como una función lineal del logaritmo de las odds: $S = A + B\ln o = A - B\,z$. Se calibran tres parámetros de negocio:</p>
+<ul>
+    <li>$S_0$: Puntaje base de referencia (ej. 600 puntos).</li>
+    <li>$O_0$: Odds base de buen pagador (ej. 50:1, equivalente a $PD \approx 1{,}96 \%$).</li>
+    <li>$\text{PDO}$: Puntos para duplicar las odds (<em>Points to Double the Odds</em>, ej. 20 puntos).</li>
+</ul>
+
+<p>Planteando el sistema de ecuaciones:</p>
+<div class="eq">$$S_0 = A + B\ln O_0, \qquad S_0 + \text{PDO} = A + B\ln(2\,O_0).$$</div>
+<p>Restando ambas expresiones se despejan unívocamente el factor $B$ y el offset $A$:</p>
+<div class="eq">$$B = \frac{\text{PDO}}{\ln 2}, \qquad A = S_0 - B\ln O_0, \qquad S = A - B\,z.$$</div>
+
+<p>Para $S_0 = 600$, $O_0 = 50$ y $\text{PDO} = 20$, se tiene $B = 28{,}8539$ y $A = 487{,}1229$:</p>
+<div class="tabla">
+<table>
+<thead>
+<tr>
+<th>PD</th>
+<th>Odds de buen pagador</th>
+<th>Puntaje resultante</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$1/101 \approx 0{,}0099$</td>
+<td>100</td>
+<td>620,0</td>
+</tr>
+<tr>
+<td>$1/51 \approx 0{,}0196$</td>
+<td>50</td>
+<td>600,0</td>
+</tr>
+<tr>
+<td>0,2000</td>
+<td>4</td>
+<td>527,1</td>
+</tr>
+<tr>
+<td>0,5000</td>
+<td>1</td>
+<td>487,1</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<h3>3. Propiedades matemáticas e invariancia</h3>
+<ol>
+    <li><strong>Monotonía estricta:</strong> $S$ es decreciente en PD. Menor riesgo siempre otorga más puntos.</li>
+    <li><strong>Duplicación de odds:</strong> Duplicar la solvencia $(1-p)/p$ suma con exactitud $\text{PDO}$ puntos.</li>
+    <li><strong>Invariancia ante cambio de escala:</strong> Cualquier elección de $(S_0', \text{PDO}')$ genera una transformación afín creciente $S' = S_0' + (\text{PDO}'/\text{PDO})(S - S_0)$. En consecuencia, el ranking de clientes, los percentiles poblacionales, el AUC, el Gini y el KS permanecen matemáticamente inalterados.</li>
+</ol>
+
+<h3>4. Descomposición aditiva de puntos por variable</h3>
+<p><strong>En Regresión Logística:</strong> Con $z = \beta_0 + \sum_j \beta_j x_j$, el puntaje se descompone de forma exacta:</p>
+<div class="eq">$$S = \underbrace{(A - B\beta_0)}_{\text{Puntos base}} + \sum_j \underbrace{(-B\, \beta_j\, x_j)}_{\text{Puntos de la variable } j}.$$</div>
+<p>Cada variable aporta $-B\beta_j$ puntos por unidad estandarizada, permitiendo auditar la contribución crediticia individual sin necesidad de agrupar en bines discretos.</p>
+
+<p><strong>En Red Neuronal (MLP):</strong> Para la red no lineal, la descomposición se realiza mediante valores <strong>SHAP</strong> en el espacio del logit ($f(x) = \phi_0 + \sum_j \phi_j(x)$), asignando a cada característica $-B\,\phi_j(x)$ puntos.</p>
+
+<figure>
+<img alt="Scorecard construida sobre el conjunto de test" src="results/figures/p4_scorecard_logreg_test.png" loading="lazy" onerror="figRespaldo(this)">
+<figcaption class="cap"><em>Figura 3.7.1. Scorecard crediticia:</em> distribución de puntajes de buenos vs malos pagadores (izquierda) y calibración empírica por deciles de puntaje (derecha).</figcaption>
+</figure>
+</div>
+</details>
+
 <!-- teoria:fin -->
         </section>
         <section class="wrap section" id="detalle">
@@ -1500,7 +2150,7 @@ $C \geq 0{,}003$ da la BCE de validación entre 0,54246 y 0,54263.</p>
             </div>
 <!-- resultados:inicio -->
 <details class="teoria" id="resultados-logistica">
-<summary><span>Regresión logística de referencia para PD</span><small>Juan David Robayo</small></summary>
+<summary><span>Regresión logística de referencia para PD</span></summary>
 <div class="prosa">
 <blockquote>
 <p>Esta sección presenta el modelo de referencia contra el que se compara la red de PD: una
@@ -1973,7 +2623,7 @@ positivo sube el logit de la PD). Intercepto: −0,322. <em>Fuente:</em> elabora
 </div>
 </details>
 <details class="teoria" id="resultados-lgd">
-<summary><span>Red neuronal de LGD</span><small>Juan David Robayo</small></summary>
+<summary><span>Red neuronal de LGD</span></summary>
 <div class="prosa">
 <blockquote>
 <p>Esta sección reporta la construcción y la selección del MLP de LGD. El criterio de selección y cuatro
@@ -2848,6 +3498,18 @@ encontrado al verificar. Se resumen en la Tabla 19.</p>
 <!-- referencias:inicio -->
 <div class="prosa refs">
 <ul>
+<li>Anderson, R. (2007). <em>The Credit Scoring Toolkit: Theory and Practice for Retail Credit Risk Management and Decision Automation</em>. Oxford University Press.</li>
+<li>Brier, G. W. (1950). Verification of forecasts expressed in terms of probability. <em>Monthly Weather Review, 78</em>(1), 1–3. <a href="https://doi.org/10.1175/1520-0493(1950)078<0001:VOFEIT>2.0.CO;2" target="_blank" rel="noopener">https://doi.org/10.1175/1520-0493(1950)078&lt;0001:VOFEIT&gt;2.0.CO;2</a></li>
+<li>Fawcett, T. (2006). An introduction to ROC analysis. <em>Pattern Recognition Letters, 27</em>(8), 861–874. <a href="https://doi.org/10.1016/j.patrec.2005.10.010" target="_blank" rel="noopener">https://doi.org/10.1016/j.patrec.2005.10.010</a></li>
+<li>Goodfellow, I., Bengio, Y., &amp; Courville, A. (2016). <em>Deep Learning</em>. MIT Press. <a href="https://www.deeplearningbook.org/" target="_blank" rel="noopener">https://www.deeplearningbook.org/</a></li>
+<li>Hanley, J. A., &amp; McNeil, B. J. (1982). The meaning and use of the area under a receiver operating characteristic (ROC) curve. <em>Radiology, 143</em>(1), 29–36. <a href="https://doi.org/10.1148/radiology.143.1.7063747" target="_blank" rel="noopener">https://doi.org/10.1148/radiology.143.1.7063747</a></li>
+<li>Lundberg, S. M., &amp; Lee, S.-I. (2017). A unified approach to interpreting model predictions. <em>Advances in Neural Information Processing Systems, 30</em>, 4765–4774.</li>
+<li>Murphy, A. H. (1973). A new vector partition of the probability score. <em>Journal of Applied Meteorology, 12</em>(4), 595–600. <a href="https://doi.org/10.1175/1520-0450(1973)012<0595:ANVPOT>2.0.CO;2" target="_blank" rel="noopener">https://doi.org/10.1175/1520-0450(1973)012&lt;0595:ANVPOT&gt;2.0.CO;2</a></li>
+<li>Nair, V., &amp; Hinton, G. E. (2010). Rectified linear units improve restricted Boltzmann machines. En <em>Proceedings of the 27th International Conference on Machine Learning (ICML 2010)</em> (pp. 807–814).</li>
+<li>Rumelhart, D. E., Hinton, G. E., &amp; Williams, R. J. (1986). Learning representations by back-propagating errors. <em>Nature, 323</em>(6088), 533–536. <a href="https://doi.org/10.1038/323533a0" target="_blank" rel="noopener">https://doi.org/10.1038/323533a0</a></li>
+<li>Saha, R. (2016). <em>Credit Risk Analysis (Lending Club Dataset)</em> [Data set]. Kaggle. <a href="https://www.kaggle.com/datasets/ranadeep/credit-risk-dataset" target="_blank" rel="noopener">https://www.kaggle.com/datasets/ranadeep/credit-risk-dataset</a></li>
+<li>Siddiqi, N. (2006). <em>Credit Risk Scorecards: Developing and Implementing Intelligent Credit Scoring</em>. John Wiley &amp; Sons. <a href="https://doi.org/10.1002/9781119201731" target="_blank" rel="noopener">https://doi.org/10.1002/9781119201731</a></li>
+
 <li>Ferrari, S. L. P., &amp; Cribari-Neto, F. (2004). Beta regression for modelling rates and proportions.
   <em>Journal of Applied Statistics, 31</em>(7), 799–815. <a href="https://doi.org/10.1080/0266476042000214501" target="_blank" rel="noopener">https://doi.org/10.1080/0266476042000214501</a></li>
 <li>Kingma, D. P., &amp; Ba, J. (2015). <em>Adam: A method for stochastic optimization</em> [Conference paper]. 3rd
